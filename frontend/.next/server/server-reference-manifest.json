@@ -1,0 +1,22 @@
+{
+  "node": {
+    "7fe26572f4e1be391924aee236aa1b3b63449b4aa3": {
+      "workers": {
+        "app/page": {
+          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fleoworley%2Fdev%2Fvoting-game%2Ffrontend%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fserver-actions.js%22%2C%5B%5B%227fe26572f4e1be391924aee236aa1b3b63449b4aa3%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
+          "async": false
+        },
+        "app/sign-in/[[...sign-in]]/page": {
+          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fleoworley%2Fdev%2Fvoting-game%2Ffrontend%2Fnode_modules%2F%40clerk%2Fnextjs%2Fdist%2Fesm%2Fapp-router%2Fserver-actions.js%22%2C%5B%5B%227fe26572f4e1be391924aee236aa1b3b63449b4aa3%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
+          "async": false
+        }
+      },
+      "layer": {
+        "app/page": "action-browser",
+        "app/sign-in/[[...sign-in]]/page": "action-browser"
+      }
+    }
+  },
+  "edge": {},
+  "encryptionKey": "u6mbbZoLMxAKxoRbNTqo3/IxnmKB10yy17dVRWx3TLg="
+}

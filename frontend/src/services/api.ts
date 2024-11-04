@@ -7,7 +7,7 @@ type GameStatus = {
 
 export const api = {
   async getGameStatus(): Promise<GameStatus> {
-    const response = await fetch('/api/game-status');
+    const response = await fetch('/api/game/status');
     if (!response.ok) {
       throw new Error('Failed to fetch game status');
     }
