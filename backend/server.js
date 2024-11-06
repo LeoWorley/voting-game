@@ -13,7 +13,7 @@ require('./config/database');  // This will execute the MongoDB connection
 const initializeDatabase = require('./config/init-db');
 initializeDatabase();
 
-// Add these lines after initialization:
+// Routes
 const gameRoutes = require('./routes/game.routes');
 const voteRoutes = require('./routes/vote.routes');
 
