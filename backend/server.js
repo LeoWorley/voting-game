@@ -2,16 +2,13 @@ require('dotenv').config();  // Load environment variables
 const express = require('express');
 const mongoose = require('mongoose');
 const app = express();
+const { initializeDatabase, closeDatabase } = require('./config/init-db');
 
 // Add middleware to parse JSON
 app.use(express.json());
 
 // Import database configuration
 require('./config/database');  // This will execute the MongoDB connection
-
-// Initialize database
-const initializeDatabase = require('./config/init-db');
-initializeDatabase();
 
 // Routes
 const gameRoutes = require('./routes/game.routes');
@@ -41,7 +38,18 @@ app.get('/api/db-test', async (req, res) => {
   }
 });
 
+// Start server
 const port = process.env.PORT || 3001;
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+initializeDatabase().then(() => {
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
+}).catch(error => {
+  console.error('Error initializing database:', error);
+  process.exit(1);
 });
+
+// Graceful shutdhown handling
+process.on('SIGTERM', closeDatabase);
+process.on('SIGINT', closeDatabase);
+process.on('uncaughtException', closeDatabase);
