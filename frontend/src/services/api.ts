@@ -21,7 +21,7 @@ export const api = {
   },
 
   async submitVotes(primaryVote: string, secondaryVote: string): Promise<void> {
-    const response = await fetch('/api/votes', {
+    const response = await fetch(`${url}/api/votes'=`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
