@@ -5,9 +5,11 @@ type GameStatus = {
   remainingPlayers: number;
 };
 
+const url = process.env.NEXT_PUBLIC_API_BASE_URL || 5050;
+
 export const api = {
   async getGameStatus(): Promise<GameStatus> {
-    const response = await fetch('/api/game/status');
+    const response = await fetch(`${url}/api/game/status`);
     if (!response.ok) {
       throw new Error('Failed to fetch game status');
     }
