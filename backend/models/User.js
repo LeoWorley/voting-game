@@ -1,26 +1,27 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-  username: {
+  clerkId: {
     type: String,
     required: true,
     unique: true
   },
-  password: {
+  username: {
     type: String,
     required: true
   },
-  isActive: {
-    type: Boolean,
-    default: true
+  imageUrl: {
+    type: String
   },
-  eliminatedAt: {
-    type: Date,
+  status: {
+    type: String,
+    enum: ['active', 'eliminated'],
+    default: 'active'
+  },
+  eliminationSession: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'VotingSession',
     default: null
-  },
-  votingRights: {
-    type: Boolean,
-    default: true
   }
 }, {
   timestamps: true

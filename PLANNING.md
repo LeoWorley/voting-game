@@ -13,29 +13,31 @@ The backend will manage the game logic, data, and security.
 The following schemas will be defined to store information in the database.
 
 #### `User`
-Represents each player in the game.
+Represents each player in the game, integrating with Clerk for authentication and tracking their status.
 
--   `clerkId`: `String` - Unique ID from Clerk for authentication.
--   `username`: `String` - User's name.
+-   `clerkId`: `String` - Unique ID from Clerk. Serves as the primary identifier for linking with the auth provider.
+-   `username`: `String` - Player's display name.
 -   `imageUrl`: `String` - URL for the profile picture.
--   `status`: `String` - User's status (`'active'`, `'eliminated'`). Default: `'active'`.
+-   `status`: `String` - Current status within the game. Can be `'active'` or `'eliminated'`.
+-   `eliminationSession`: `ObjectId` - Reference to the `VotingSession` where the user was eliminated. Null if active.
 
 #### `VotingSession`
 Represents a weekly voting cycle.
 
--   `startTime`: `Date` - Start date and time for voting.
--   `endTime`: `Date` - End date and time for voting.
--   `isActive`: `Boolean` - Indicates if the session is currently open.
--   `eliminatedUser`: `ObjectId` - Reference to the `User` eliminated in this session.
+-   `name`: `String` - A descriptive name for the session (e.g., "Week 1", "Week 2").
+-   `startTime`: `Date` - The exact date and time when voting opens.
+-   `endTime`: `Date` - The exact date and time when voting closes.
+-   `isActive`: `Boolean` - A flag to quickly identify if the session is currently open for voting.
+-   `eliminatedUser`: `ObjectId` - Reference to the `User` who was eliminated at the end of this session.
 
 #### `Vote`
-Represents an individual vote cast by a user.
+Represents an individual vote cast by one user for another during a specific session.
 
--   `sessionId`: `ObjectId` - Reference to the `VotingSession`.
--   `voterId`: `ObjectId` - Reference to the `User` who is voting. **(Admin backdoor)**.
--   `votedForId`: `ObjectId` - Reference to the `User` receiving the vote.
--   `points`: `Number` - `2` for the primary vote, `1` for the secondary vote.
--   `reason`: `String` - Justification for the vote.
+-   `sessionId`: `ObjectId` - Reference to the `VotingSession` this vote belongs to.
+-   `voterId`: `ObjectId` - Reference to the `User` who cast the vote.
+-   `votedForId`: `ObjectId` - Reference to the `User` who received the vote.
+-   `points`: `Number` - The value of the vote, either `2` (primary) or `1` (secondary).
+-   `reason`: `String` - The justification provided by the voter.
 
 ### 2. API Endpoints (Express.js)
 

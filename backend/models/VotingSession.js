@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
 const votingSessionSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true
+  },
   startTime: {
     type: Date,
     required: true
