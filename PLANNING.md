@@ -9,11 +9,11 @@ All instructions within this plan, as well as all code comments and documentatio
 
 ---
 
-## Phase 1: Backend (Node.js with Mongoose)
+## Phase 1: Backend (Node.js with Mongoose) - COMPLETED
 
 The backend will manage the game logic, data, and security.
 
-### 1. Data Models (MongoDB/Mongoose)
+### 1. Data Models (MongoDB/Mongoose) - COMPLETED
 
 The following schemas will be defined to store information in the database.
 
@@ -44,7 +44,7 @@ Represents an individual vote cast by one user for another during a specific ses
 -   `points`: `Number` - The value of the vote, either `2` (primary) or `1` (secondary).
 -   `reason`: `String` - The justification provided by the voter.
 
-### 2. API Endpoints (Express.js)
+### 2. API Endpoints (Express.js) - COMPLETED
 
 The following endpoints will be created for communication between the frontend and backend.
 
