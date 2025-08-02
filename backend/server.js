@@ -11,11 +11,15 @@ app.use(express.json());
 require('./config/database');  // This will execute the MongoDB connection
 
 // Routes
-const gameRoutes = require('./routes/game.routes');
+const userRoutes = require('./routes/user.routes');
+const votingRoutes = require('./routes/game.routes');
 const voteRoutes = require('./routes/vote.routes');
+const resultsRoutes = require('./routes/results.routes');
 
-app.use('/api/game', gameRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/voting', votingRoutes); // Path changed from /game
 app.use('/api/votes', voteRoutes);
+app.use('/api/results', resultsRoutes);
 
 // Test route
 app.get('/api/test', (req, res) => {
