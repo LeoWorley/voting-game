@@ -4,6 +4,11 @@ This document outlines the development plan for a weekly voting game inspired by
 
 ---
 
+## Language and Documentation Policy
+All instructions within this plan, as well as all code comments and documentation throughout the project, must be written in English.
+
+---
+
 ## Phase 1: Backend (Node.js with Mongoose)
 
 The backend will manage the game logic, data, and security.
@@ -106,3 +111,12 @@ An automated process will manage the weekly voting cycle.
     4.  Updates the user's `status` to `'eliminated'`.
     5.  Stores the eliminated user's ID in the current `VotingSession`.
     6.  Creates a new `VotingSession` for the following week, marking it as `isActive: true`.
+
+---
+
+## Future Considerations and Plan Maintenance
+
+This document is a living guide. Any new technical considerations, optimizations, or ideas that arise during development and are not immediately implemented should be recorded in this section for future reference.
+
+-   **Database Optimization:** Add indexes to frequently queried fields (e.g., `clerkId` on `User`, `sessionId` on `Vote`) to improve performance.
+-   **Voting Constraints:** Ensure vote uniqueness. A `voterId` can only submit one 2-point vote and one 1-point vote per `sessionId`. This must be handled in the application logic.
