@@ -7,9 +7,6 @@ const { initializeDatabase, closeDatabase } = require('./config/init-db');
 // Add middleware to parse JSON
 app.use(express.json());
 
-// Import database configuration
-require('./config/database');  // This will execute the MongoDB connection
-
 // Routes
 const userRoutes = require('./routes/user.routes');
 const votingRoutes = require('./routes/game.routes');
