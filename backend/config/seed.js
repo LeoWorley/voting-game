@@ -1,3 +1,5 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const { VotingSession } = require('../models');
 const { initializeDatabase, closeDatabase } = require('./init-db');
 
