@@ -13,7 +13,7 @@ All instructions within this plan, as well as all code comments and documentatio
 
 The backend will manage the game logic, data, and security.
 
-### 1. Data Models (MongoDB/Mongoose) - IN PROGRESS
+### 1. Data Models (MongoDB/Mongoose) - COMPLETED
 
 The following schemas will be defined to store information in the database.
 
@@ -44,7 +44,7 @@ Represents an individual vote cast by one user for another during a specific ses
 -   `points`: `Number` - The value of the vote, either `2` (primary) or `1` (secondary).
 -   `reason`: `String` - The justification provided by the voter.
 
-### 2. API Endpoints (Express.js) - COMPLETED
+### 2. API Endpoints (Express.js) - IN PROGRESS
 
 The following endpoints will be created for communication between the frontend and backend.
 
@@ -52,25 +52,30 @@ The following endpoints will be created for communication between the frontend a
 -   **`POST /api/users/sync`**
     -   **Description:** Receives a webhook from Clerk to create or update users in the local database when they sign up or modify their profile.
     -   **Protection:** Clerk Webhook.
+    -   **Status:** In Progress — route implemented; webhook signature verification pending.
 
 #### Voting
 -   **`GET /api/voting/status`**
     -   **Description:** Returns the status of the current voting session (active/inactive), start/end dates, and the list of eligible users (`status: 'active'`).
     -   **Protection:** Requires user authentication.
+    -   **Status:** In Progress — route implemented; authentication not enforced yet.
 
 -   **`POST /api/votes`**
     -   **Description:** Allows an authenticated and active user to cast their two votes (primary and secondary).
     -   **Payload:** `{ primaryVote: { userId, reason }, secondaryVote: { userId, reason } }`
     -   **Protection:** Requires user authentication.
+    -   **Status:** In Progress — route implemented; authentication and duplicate-vote prevention not enforced yet.
 
 #### Results and Backdoor
 -   **`GET /api/results/latest`**
     -   **Description:** Returns the anonymous results of the last closed voting session.
     -   **Protection:** Public or requires user authentication.
+    -   **Status:** Completed — implemented and functional.
 
 -   **`GET /api/admin/detailed-results/:sessionId`**
     -   **Description:** **(Backdoor)** Returns all vote details for a session, including `voterId`.
     -   **Protection:** Requires an admin role or a secret API key.
+    -   **Status:** In Progress — implemented; admin/API key guard not added yet.
 
 ---
 
@@ -118,5 +123,15 @@ An automated process will manage the weekly voting cycle.
 
 This document is a living guide. Any new technical considerations, optimizations, or ideas that arise during development and are not immediately implemented should be recorded in this section for future reference.
 
--   **Database Optimization:** Add indexes to frequently queried fields (e.g., `clerkId` on `User`, `sessionId` on `Vote`) to improve performance.
--   **Voting Constraints:** Ensure vote uniqueness. A `voterId` can only submit one 2-point vote and one 1-point vote per `sessionId`. This must be handled in the application logic.
+-   **Database Optimization:** Add indexes to frequently queried fields (e.g., `clerkId` on `User`, `sessionId` on `Vote`) to improve performance. — Status: TODO
+-   **Voting Constraints:** Ensure vote uniqueness. A `voterId` can only submit one 2-point vote and one 1-point vote per `sessionId`. This must be handled in the application logic. — Status: TODO
+
+---
+
+## Phase 1: Security and Constraints Checklist
+
+-   **Clerk authentication on routes** — Status: TODO (apply middleware and use `req.auth` in voting endpoints).
+-   **Admin protection for detailed results** — Status: TODO (role check or `X-API-Key` against env var).
+-   **Verify Clerk webhook signatures** — Status: TODO (validate `/api/users/sync` requests).
+-   **Enforce voting constraints server-side** — Status: TODO (one primary + one secondary per session, primary ≠ secondary, targets must be active; reject duplicates).
+-   **Indexes** — Status: TODO (add indexes on `Vote.sessionId`, `Vote.voterId`, `VotingSession.isActive`; `User.clerkId` uniqueness is already in place).
