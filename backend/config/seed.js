@@ -7,6 +7,7 @@ async function seedDatabase() {
 
   // Create a new voting session
   await VotingSession.create({
+    name: 'Week 1 Voting',
     startTime: new Date(),
     endTime: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
     isActive: true,

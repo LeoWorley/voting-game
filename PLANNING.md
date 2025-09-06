@@ -9,11 +9,11 @@ All instructions within this plan, as well as all code comments and documentatio
 
 ---
 
-## Phase 1: Backend (Node.js with Mongoose) - COMPLETED
+## Phase 1: Backend (Node.js with Mongoose) - IN PROGRESS
 
 The backend will manage the game logic, data, and security.
 
-### 1. Data Models (MongoDB/Mongoose) - COMPLETED
+### 1. Data Models (MongoDB/Mongoose) - IN PROGRESS
 
 The following schemas will be defined to store information in the database.
 
