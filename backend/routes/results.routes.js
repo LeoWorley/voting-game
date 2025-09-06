@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { adminApiKeyGuard } = require('../middleware/admin');
 const { Vote, VotingSession, User } = require('../models');
 
 // Corresponds to GET /api/results/latest
@@ -19,7 +20,7 @@ router.get('/latest', async (req, res) => {
 });
 
 // Corresponds to GET /api/admin/detailed-results/:sessionId
-router.get('/admin/detailed-results/:sessionId', async (req, res) => {
+router.get('/admin/detailed-results/:sessionId', adminApiKeyGuard, async (req, res) => {
   // TODO: Protect this route with admin-only access
   try {
     const { sessionId } = req.params;

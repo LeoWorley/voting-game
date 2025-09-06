@@ -11,7 +11,7 @@ export default async function Dashboard() {
     redirect("/sign-in");
   }
 
-  const votingStatus = await api.getVotingStatus();
+  const votingStatus = await api.getVotingStatus({ devUserId: userId });
 
   const latestResults = !votingStatus.isVotingDay 
     ? await api.getLatestResults() 

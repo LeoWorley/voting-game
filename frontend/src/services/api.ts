@@ -33,9 +33,26 @@ type VotePayload = {
 
 const url = process.env.NEXT_PUBLIC_API_BASE_URL || 5050;
 
+type AuthOpts = { devUserId?: string; token?: string };
+
+function buildHeaders(base?: Record<string, string>, opts?: AuthOpts): HeadersInit {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(base || {})
+  };
+  if (opts?.token) {
+    headers['Authorization'] = `Bearer ${opts.token}`;
+  } else if (opts?.devUserId) {
+    headers['X-Dev-User-Id'] = opts.devUserId;
+  }
+  return headers;
+}
+
 export const api = {
-  async getVotingStatus(): Promise<VotingStatus> {
-    const response = await fetch(`${url}/api/voting/status`);
+  async getVotingStatus(opts?: AuthOpts): Promise<VotingStatus> {
+    const response = await fetch(`${url}/api/voting/status`, {
+      headers: buildHeaders(undefined, opts)
+    });
     if (!response.ok) {
       throw new Error('Failed to fetch voting status');
     }
@@ -46,12 +63,10 @@ export const api = {
     };
   },
 
-  async submitVotes(primaryVote: VotePayload, secondaryVote: VotePayload): Promise<void> {
+  async submitVotes(primaryVote: VotePayload, secondaryVote: VotePayload, opts?: AuthOpts): Promise<void> {
     const response = await fetch(`${url}/api/votes`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: buildHeaders(undefined, opts),
       body: JSON.stringify({
         primaryVote,
         secondaryVote,

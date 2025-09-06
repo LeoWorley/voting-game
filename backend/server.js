@@ -4,6 +4,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const app = express();
 const { initializeDatabase, closeDatabase } = require('./config/init-db');
+const { authMiddleware } = require('./middleware/auth');
 
 // Add middleware to parse JSON
 app.use(express.json());
@@ -15,8 +16,9 @@ const voteRoutes = require('./routes/vote.routes');
 const resultsRoutes = require('./routes/results.routes');
 
 app.use('/api/users', userRoutes);
-app.use('/api/voting', votingRoutes); // Path changed from /game
-app.use('/api/votes', voteRoutes);
+// Protect voting status and votes with auth middleware
+app.use('/api/voting', authMiddleware, votingRoutes); // Path changed from /game
+app.use('/api/votes', authMiddleware, voteRoutes);
 app.use('/api/results', resultsRoutes);
 
 // Test route

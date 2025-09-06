@@ -1,13 +1,15 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
 import { api, Player } from '@/services/api';
+import { useAuth } from "@clerk/nextjs";
 
 type VotingFormProps = {
   eligiblePlayers: Player[];
 };
 
 export function VotingForm({ eligiblePlayers }: VotingFormProps) {
+  const { userId } = useAuth();
   const [primaryVote, setPrimaryVote] = useState('');
   const [primaryReason, setPrimaryReason] = useState('');
   const [secondaryVote, setSecondaryVote] = useState('');
@@ -32,7 +34,8 @@ export function VotingForm({ eligiblePlayers }: VotingFormProps) {
     try {
       await api.submitVotes(
         { userId: primaryVote, reason: primaryReason },
-        { userId: secondaryVote, reason: secondaryReason }
+        { userId: secondaryVote, reason: secondaryReason },
+        { devUserId: userId || undefined }
       );
       setIsSuccess(true);
     } catch (err) {

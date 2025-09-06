@@ -4,8 +4,11 @@ const { Vote, VotingSession, User } = require('../models');
 
 router.post('/', async (req, res) => {
   try {
-    // TODO: Get authenticated user's Clerk ID from req.auth
-    const voterClerkId = "user_2f9rblpS1yGfQ2kY8nZ7bX6cW5a"; // Placeholder
+    // Clerk-authenticated user from middleware
+    const voterClerkId = req.auth?.userId;
+    if (!voterClerkId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
 
     const { primaryVote, secondaryVote } = req.body; // Expects { userId, reason }
     const activeSession = await VotingSession.findOne({ isActive: true });

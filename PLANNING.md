@@ -58,13 +58,13 @@ The following endpoints will be created for communication between the frontend a
 -   **`GET /api/voting/status`**
     -   **Description:** Returns the status of the current voting session (active/inactive), start/end dates, and the list of eligible users (`status: 'active'`).
     -   **Protection:** Requires user authentication.
-    -   **Status:** In Progress — route implemented; authentication not enforced yet.
+    -   **Status:** In Progress — route implemented; authentication not enforced yet (frontend now sends dev header; backend auth middleware in place).
 
 -   **`POST /api/votes`**
     -   **Description:** Allows an authenticated and active user to cast their two votes (primary and secondary).
     -   **Payload:** `{ primaryVote: { userId, reason }, secondaryVote: { userId, reason } }`
     -   **Protection:** Requires user authentication.
-    -   **Status:** In Progress — route implemented; authentication and duplicate-vote prevention not enforced yet.
+    -   **Status:** In Progress — route implemented; authentication wired via middleware and dev header; duplicate-vote prevention not enforced yet.
 
 #### Results and Backdoor
 -   **`GET /api/results/latest`**
@@ -75,7 +75,7 @@ The following endpoints will be created for communication between the frontend a
 -   **`GET /api/admin/detailed-results/:sessionId`**
     -   **Description:** **(Backdoor)** Returns all vote details for a session, including `voterId`.
     -   **Protection:** Requires an admin role or a secret API key.
-    -   **Status:** In Progress — implemented; admin/API key guard not added yet.
+    -   **Status:** Completed — implemented and protected via `X-API-Key` guard.
 
 ---
 
@@ -131,7 +131,15 @@ This document is a living guide. Any new technical considerations, optimizations
 ## Phase 1: Security and Constraints Checklist
 
 -   **Clerk authentication on routes** — Status: TODO (apply middleware and use `req.auth` in voting endpoints).
+-   Update: Basic auth middleware added; dev fallback via `X-Dev-User-Id` enabled for local.
+-   Frontend now sends dev header to protected endpoints.
 -   **Admin protection for detailed results** — Status: TODO (role check or `X-API-Key` against env var).
+-   Update: API key guard implemented on admin detailed results endpoint.
 -   **Verify Clerk webhook signatures** — Status: TODO (validate `/api/users/sync` requests).
 -   **Enforce voting constraints server-side** — Status: TODO (one primary + one secondary per session, primary ≠ secondary, targets must be active; reject duplicates).
 -   **Indexes** — Status: TODO (add indexes on `Vote.sessionId`, `Vote.voterId`, `VotingSession.isActive`; `User.clerkId` uniqueness is already in place).
+
+### Phase 1 Note: Auth Hardening for Prod
+
+- Replace dev auth fallback with verified Clerk auth before staging/prod (use `@clerk/express` or JWKS verification). Remove `X-Dev-User-Id` path.
+- Update frontend to send real `Authorization: Bearer` Clerk token instead of dev header in production.
