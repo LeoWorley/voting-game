@@ -58,13 +58,13 @@ The following endpoints will be created for communication between the frontend a
 -   **`GET /api/voting/status`**
     -   **Description:** Returns the status of the current voting session (active/inactive), start/end dates, and the list of eligible users (`status: 'active'`).
     -   **Protection:** Requires user authentication.
-    -   **Status:** In Progress — route implemented; authentication not enforced yet (frontend now sends dev header; backend auth middleware in place).
+    -   **Status:** In Progress — route implemented; authentication enforced via middleware (dev header supported locally).
 
 -   **`POST /api/votes`**
     -   **Description:** Allows an authenticated and active user to cast their two votes (primary and secondary).
     -   **Payload:** `{ primaryVote: { userId, reason }, secondaryVote: { userId, reason } }`
     -   **Protection:** Requires user authentication.
-    -   **Status:** In Progress — route implemented; authentication wired via middleware and dev header; duplicate-vote prevention not enforced yet.
+    -   **Status:** Completed — authentication enforced; server-side rules validate one primary (2 pts) and one secondary (1 pt), disallow self/double-target; upsert policy allows updates until session closes; backed by DB unique index.
 
 #### Results and Backdoor
 -   **`GET /api/results/latest`**
@@ -123,21 +123,19 @@ An automated process will manage the weekly voting cycle.
 
 This document is a living guide. Any new technical considerations, optimizations, or ideas that arise during development and are not immediately implemented should be recorded in this section for future reference.
 
--   **Database Optimization:** Add indexes to frequently queried fields (e.g., `clerkId` on `User`, `sessionId` on `Vote`) to improve performance. — Status: TODO
--   **Voting Constraints:** Ensure vote uniqueness. A `voterId` can only submit one 2-point vote and one 1-point vote per `sessionId`. This must be handled in the application logic. — Status: TODO
+-   **Database Optimization:** Add indexes to frequently queried fields (e.g., `clerkId` on `User`, `sessionId` on `Vote`) to improve performance. — Status: Completed (indexes added on `Vote` and `VotingSession`).
+-   **Voting Constraints:** Ensure vote uniqueness. A `voterId` can only submit one 2-point vote and one 1-point vote per `sessionId`. This must be handled in the application logic. — Status: Completed (validated and enforced with unique index + upsert policy).
 
 ---
 
 ## Phase 1: Security and Constraints Checklist
 
--   **Clerk authentication on routes** — Status: TODO (apply middleware and use `req.auth` in voting endpoints).
--   Update: Basic auth middleware added; dev fallback via `X-Dev-User-Id` enabled for local.
--   Frontend now sends dev header to protected endpoints.
--   **Admin protection for detailed results** — Status: TODO (role check or `X-API-Key` against env var).
--   Update: API key guard implemented on admin detailed results endpoint.
+-   **Clerk authentication on routes** — Status: Completed (middleware applied; `req.auth` used; dev fallback via `X-Dev-User-Id` for local).
+-   Frontend sends dev header to protected endpoints in local.
+-   **Admin protection for detailed results** — Status: Completed (`X-API-Key` guard implemented on detailed results endpoint).
 -   **Verify Clerk webhook signatures** — Status: TODO (validate `/api/users/sync` requests).
--   **Enforce voting constraints server-side** — Status: TODO (one primary + one secondary per session, primary ≠ secondary, targets must be active; reject duplicates).
--   **Indexes** — Status: TODO (add indexes on `Vote.sessionId`, `Vote.voterId`, `VotingSession.isActive`; `User.clerkId` uniqueness is already in place).
+-   **Enforce voting constraints server-side** — Status: Completed (validate session active/time window; one primary + one secondary; primary ≠ secondary; no self-vote; targets must be active; upsert policy prevents duplicates).
+-   **Indexes** — Status: Completed (added unique index on `Vote(sessionId, voterId, points)`; additional indexes on `Vote` and `VotingSession.isActive`).
 
 ### Phase 1 Note: Auth Hardening for Prod
 

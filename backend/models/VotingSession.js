@@ -26,4 +26,8 @@ const votingSessionSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Speed up queries for active session checks
+votingSessionSchema.index({ isActive: 1 });
+votingSessionSchema.index({ endTime: -1 });
+
 module.exports = mongoose.models.VotingSession || mongoose.model('VotingSession', votingSessionSchema);
