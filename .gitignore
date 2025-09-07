@@ -12,8 +12,11 @@ node_modules
 /coverage
 
 # Next.js
+# Ignore Next.js build output everywhere, including nested apps (e.g., frontend/.next)
 /.next/
+**/.next/
 /out/
+**/out/
 
 # Production
 /build
