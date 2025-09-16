@@ -1,143 +1,170 @@
 # Development Plan: "Big Brother" Style Voting Game
 
-This document outlines the development plan for a weekly voting game inspired by "Big Brother".
+This plan describes the local-first web app for a weekly elimination game (Big Brother-like) to be used with coworkers, and the path to a hardened deployment.
 
 ---
 
 ## Language and Documentation Policy
-All instructions within this plan, as well as all code comments and documentation throughout the project, must be written in English.
+- All code comments and documentation are in English.
+- UI language: currently Spanish copy exists; standardize on English for now or introduce i18n (simple dictionary) when time permits.
 
 ---
 
-## Phase 1: Backend (Node.js with Mongoose) - IN PROGRESS
+## Game Rules and Mechanics
 
-The backend will manage the game logic, data, and security.
+### Voting
+- Each player casts 2 votes per session: Primary (2 pts) and Secondary (1 pt).
+- Cannot vote for self. Primary and Secondary must target different users.
+- Votes can be edited until the session closes.
 
-### 1. Data Models (MongoDB/Mongoose) - COMPLETED
+### Tie-breakers
+Deterministic, documented order:
+1) Highest total points
+2) Most primary (2-point) votes
+3) Earliest final submission timestamp by the tied target (when the last vote affecting them was submitted)
+4) Admin decision (recorded in audit log)
 
-The following schemas will be defined to store information in the database.
-
-#### `User`
-Represents each player in the game, integrating with Clerk for authentication and tracking their status.
-
--   `clerkId`: `String` - Unique ID from Clerk. Serves as the primary identifier for linking with the auth provider.
--   `username`: `String` - Player's display name.
--   `imageUrl`: `String` - URL for the profile picture.
--   `status`: `String` - Current status within the game. Can be `'active'` or `'eliminated'`.
--   `eliminationSession`: `ObjectId` - Reference to the `VotingSession` where the user was eliminated. Null if active.
-
-#### `VotingSession`
-Represents a weekly voting cycle.
-
--   `name`: `String` - A descriptive name for the session (e.g., "Week 1", "Week 2").
--   `startTime`: `Date` - The exact date and time when voting opens.
--   `endTime`: `Date` - The exact date and time when voting closes.
--   `isActive`: `Boolean` - A flag to quickly identify if the session is currently open for voting.
--   `eliminatedUser`: `ObjectId` - Reference to the `User` who was eliminated at the end of this session.
-
-#### `Vote`
-Represents an individual vote cast by one user for another during a specific session.
-
--   `sessionId`: `ObjectId` - Reference to the `VotingSession` this vote belongs to.
--   `voterId`: `ObjectId` - Reference to the `User` who cast the vote.
--   `votedForId`: `ObjectId` - Reference to the `User` who received the vote.
--   `points`: `Number` - The value of the vote, either `2` (primary) or `1` (secondary).
--   `reason`: `String` - The justification provided by the voter.
-
-### 2. API Endpoints (Express.js) - IN PROGRESS
-
-The following endpoints will be created for communication between the frontend and backend.
-
-#### Authentication and Users
--   **`POST /api/users/sync`**
-    -   **Description:** Receives a webhook from Clerk to create or update users in the local database when they sign up or modify their profile.
-    -   **Protection:** Clerk Webhook.
-    -   **Status:** In Progress — route implemented; webhook signature verification pending.
-
-#### Voting
--   **`GET /api/voting/status`**
-    -   **Description:** Returns the status of the current voting session (active/inactive), start/end dates, and the list of eligible users (`status: 'active'`).
-    -   **Protection:** Requires user authentication.
-    -   **Status:** In Progress — route implemented; authentication enforced via middleware (dev header supported locally).
-
--   **`POST /api/votes`**
-    -   **Description:** Allows an authenticated and active user to cast their two votes (primary and secondary).
-    -   **Payload:** `{ primaryVote: { userId, reason }, secondaryVote: { userId, reason } }`
-    -   **Protection:** Requires user authentication.
-    -   **Status:** Completed — authentication enforced; server-side rules validate one primary (2 pts) and one secondary (1 pt), disallow self/double-target; upsert policy allows updates until session closes; backed by DB unique index.
-
-#### Results and Backdoor
--   **`GET /api/results/latest`**
-    -   **Description:** Returns the anonymous results of the last closed voting session.
-    -   **Protection:** Public or requires user authentication.
-    -   **Status:** Completed — implemented and functional.
-
--   **`GET /api/admin/detailed-results/:sessionId`**
-    -   **Description:** **(Backdoor)** Returns all vote details for a session, including `voterId`.
-    -   **Protection:** Requires an admin role or a secret API key.
-    -   **Status:** Completed — implemented and protected via `X-API-Key` guard.
+### Visibility
+- Public (or all players): anonymized session results (scores per player, eliminated user).
+- Admin-only: detailed results (who voted for whom with reasons).
 
 ---
 
-## Phase 2: Frontend (Next.js with React)
+## Phase 1: Backend (Node.js + Express + Mongoose) — IN PROGRESS
 
-The frontend will be the interface that users interact with.
+The backend manages game logic, data, and security.
 
-### 1. Pages and Components
+### 1) Data Models — COMPLETED (current)
 
--   **Authentication (`/sign-in`, `/sign-up`)**
-    -   The existing integration with Clerk will be maintained.
+`User`
+- `clerkId: String` — unique external ID
+- `username: String`
+- `imageUrl: String`
+- `status: 'active' | 'eliminated'`
+- `eliminationSession: ObjectId | null`
 
--   **Dashboard (`/dashboard`)**
-    -   Calls `GET /api/voting/status` on load.
-    -   **If voting is active:**
-        -   Displays a form to select two users and write the reasons.
-        -   The form is disabled if the current user is eliminated (`status: 'eliminated'`).
-        -   On submit, it calls `POST /api/votes`.
-    -   **If voting is closed:**
-        -   Displays an informational message and the results of the last round.
+`VotingSession`
+- `name: String`
+- `startTime: Date`
+- `endTime: Date`
+- `isActive: Boolean`
+- `eliminatedUser: ObjectId | null`
 
--   **Results Page (`/results`)**
-    -   Displays a history of past voting sessions, showing who was eliminated in each one.
+`Vote`
+- `sessionId: ObjectId`
+- `voterId: ObjectId`
+- `votedForId: ObjectId`
+- `points: 1 | 2`
+- `reason: String`
+
+Indexes — COMPLETED
+- Unique: `(sessionId, voterId, points)` to ensure one vote per tier per session.
+- Supportive: indexes on `Vote.sessionId`, `VotingSession.isActive`, `VotingSession.endTime`.
+
+### 2) Authentication and Security
+- Local-first: enable dev header `X-Dev-User-Id` via middleware. Controlled by `ENABLE_DEV_AUTH_FALLBACK=true` or non-production env.
+- Clerk webhooks: route present; signature verification — TODO for production.
+- Admin guard: `X-API-Key` required for admin endpoints (`ADMIN_API_KEY`).
+
+### 3) API Endpoints — STATUS
+
+Auth & Users
+- `POST /api/users/sync` — Clerk webhook to upsert users. Status: implemented; signature verification — TODO.
+
+Voting
+- `GET /api/voting/status` — canonical contract to unify frontend/back:
+  - Response: `{ isVotingOpen: boolean, startTime?: Date, endTime?: Date, sessionName?: string, eligiblePlayers: Array<{ id, username, imageUrl }>, me: { clerkId: string, isActive: boolean } }`
+  - Status: implemented (currently returns `isVotingActive`, `startTime`, `endTime`, `sessionName`, `eligiblePlayers`). TODO: align naming and include `me`.
+- `POST /api/votes` — submit primary (2 pts) and secondary (1 pt) votes; idempotent upsert per tier. Status: completed.
+- `GET /api/votes/me?sessionId=current` — retrieve current user’s votes for the active session to support editing. Status: TODO.
+
+Results
+- `GET /api/results/latest` — latest closed session with eliminated user. Status: completed.
+- `GET /api/results/aggregate/:sessionId` — anonymized counts per target (primary, secondary, total). Status: TODO.
+- `GET /api/admin/detailed-results/:sessionId` — full vote details; `X-API-Key` protected. Status: completed.
+
+Session Lifecycle (admin)
+- `POST /api/admin/sessions/open` — create/open a new session. Status: TODO.
+- `POST /api/admin/sessions/close-and-eliminate` — close active session, compute totals with tie-breakers, set eliminated user, mark users, open next session (optional). Status: TODO.
+- `GET /api/sessions/history` — list sessions with eliminated user. Status: TODO.
+
+### 4) Operational Concerns
+- CORS for local dev: allow `http://localhost:3000`. Status: TODO.
+- Transactions: optional MongoDB transaction wrapping dual upserts for strict atomicity; current unique-index approach is acceptable locally. Status: optional/TODO.
+- Audit log: record admin actions (session open/close, manual tie-break). Status: TODO.
 
 ---
 
-## Phase 3: Automation (Cron Job)
+## Phase 2: Frontend (Next.js + React) — PLANNED
 
-An automated process will manage the weekly voting cycle.
+Pages & Components
+- Auth (`/sign-in`, `/sign-up`) — maintain Clerk for now; support dev-mode header in API client for local.
+- Dashboard (`/dashboard`)
+  - Calls `GET /api/voting/status`.
+  - If open and user active: show voting form with eligible players; pre-fill current votes via `GET /api/votes/me` to allow edit.
+  - If closed: show latest results and link to history.
+- Results (`/results`) — history of sessions with eliminated players and aggregate scores.
+- Admin (local) (`/admin`) — minimal controls: open session, close+eliminate (runs the algorithm), view aggregates.
 
-### 1. Weekly Script (`node-cron` or similar)
-
--   **Trigger:** Runs weekly at a predefined time (e.g., Saturday at 10:00 PM).
--   **Logic:**
-    1.  Closes the current voting session (`isActive: false`).
-    2.  Calculates the total points for each user voted for in that session.
-    3.  Identifies the user with the highest score.
-    4.  Updates the user's `status` to `'eliminated'`.
-    5.  Stores the eliminated user's ID in the current `VotingSession`.
-    6.  Creates a new `VotingSession` for the following week, marking it as `isActive: true`.
-
----
-
-## Future Considerations and Plan Maintenance
-
-This document is a living guide. Any new technical considerations, optimizations, or ideas that arise during development and are not immediately implemented should be recorded in this section for future reference.
-
--   **Database Optimization:** Add indexes to frequently queried fields (e.g., `clerkId` on `User`, `sessionId` on `Vote`) to improve performance. — Status: Completed (indexes added on `Vote` and `VotingSession`).
--   **Voting Constraints:** Ensure vote uniqueness. A `voterId` can only submit one 2-point vote and one 1-point vote per `sessionId`. This must be handled in the application logic. — Status: Completed (validated and enforced with unique index + upsert policy).
+UX Notes
+- Disable form for eliminated users or when window closed.
+- Reasons are optional; display where appropriate.
+- Language consistency: keep UI copy in English (or add i18n switch if needed).
 
 ---
 
-## Phase 1: Security and Constraints Checklist
+## Phase 3: Automation — PLANNED
 
--   **Clerk authentication on routes** — Status: Completed (middleware applied; `req.auth` used; dev fallback via `X-Dev-User-Id` for local).
--   Frontend sends dev header to protected endpoints in local.
--   **Admin protection for detailed results** — Status: Completed (`X-API-Key` guard implemented on detailed results endpoint).
--   **Verify Clerk webhook signatures** — Status: TODO (validate `/api/users/sync` requests).
--   **Enforce voting constraints server-side** — Status: Completed (validate session active/time window; one primary + one secondary; primary ≠ secondary; no self-vote; targets must be active; upsert policy prevents duplicates).
--   **Indexes** — Status: Completed (added unique index on `Vote(sessionId, voterId, points)`; additional indexes on `Vote` and `VotingSession.isActive`).
+Start manual, then automate.
 
-### Phase 1 Note: Auth Hardening for Prod
+Manual-first
+- Admin triggers `close-and-eliminate` weekly; the endpoint computes totals, applies tie-breakers, marks elimination, and optionally opens the next session.
 
-- Replace dev auth fallback with verified Clerk auth before staging/prod (use `@clerk/express` or JWKS verification). Remove `X-Dev-User-Id` path.
-- Update frontend to send real `Authorization: Bearer` Clerk token instead of dev header in production.
+Cron (later)
+- Weekly schedule (e.g., Saturday 22:00 in a chosen timezone) to run the same logic as the manual endpoint. Ensure idempotency (safe re-runs).
+
+---
+
+## Security and Constraints Checklist
+
+- Clerk authentication on routes — Completed (middleware; dev fallback via `X-Dev-User-Id`).
+- Frontend sends dev header locally — Completed.
+- Admin protection for detailed results — Completed (`X-API-Key`).
+- Verify Clerk webhook signatures — TODO (`/api/users/sync`).
+- Enforce voting constraints server-side — Completed (active window; primary+secondary; distinct targets; no self; targets active; upsert policy and unique index).
+- Indexes — Completed (unique and supportive indexes in place).
+- CORS for local dev — TODO.
+
+Auth Hardening for Prod
+- Replace dev fallback with verified Clerk auth (@clerk/express or JWKS verification).
+- Frontend uses real `Authorization: Bearer` token instead of dev header in prod.
+
+---
+
+## Observability and Auditing — PLANNED
+- Structured logs for vote submissions, session open/close, and admin actions.
+- Minimal `audits` collection: `{ actor, action, target, metadata, createdAt }`.
+
+---
+
+## Testing Plan — PLANNED
+- Unit tests: vote constraints (no self, unique tiers, active targets), status endpoint contract, tie-breaker function.
+- Integration test: end-to-end session close-and-eliminate with deterministic tie cases.
+- Seeded local data for reproducible smoke tests.
+
+---
+
+## Documentation & DevX — PLANNED
+- README updates:
+  - Add envs: `ADMIN_API_KEY`, `ENABLE_DEV_AUTH_FALLBACK=true`.
+  - Local quickstart: seed users, open session, submit votes, close session, view results.
+  - Note CORS setup for local.
+- Remove or implement Socket.IO reference (keep only if realtime UI planned).
+
+---
+
+## Future Considerations
+- Add role on `User` for richer admin controls when Clerk is fully integrated.
+- Realtime updates (Socket.IO or SSE) on results or session status.
+- i18n support for bilingual teams.
+- Export reports per session (CSV or JSON) for retrospectives.
