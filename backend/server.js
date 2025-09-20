@@ -6,8 +6,14 @@ const app = express();
 const { initializeDatabase, closeDatabase } = require('./config/init-db');
 const { authMiddleware } = require('./middleware/auth');
 
-// Add middleware to parse JSON
-app.use(express.json());
+// Add middleware to parse JSON and capture raw body for Clerk webhooks
+app.use(express.json({
+  verify: (req, res, buf) => {
+    if (buf?.length && req.originalUrl.startsWith('/api/users/sync')) {
+      req.rawBody = Buffer.from(buf);
+    }
+  }
+}));
 
 // Routes
 const userRoutes = require('./routes/user.routes');

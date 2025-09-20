@@ -1,24 +1,5 @@
-// Lightweight Clerk-style auth middleware.
-// In production, replace with @clerk/express or verified JWT checks.
-
-function decodeBase64Url(str) {
-  // Convert base64url to base64
-  str = str.replace(/-/g, '+').replace(/_/g, '/');
-  // Pad with '='
-  while (str.length % 4) str += '=';
-  return Buffer.from(str, 'base64').toString('utf8');
-}
-
-function parseJwtWithoutVerify(token) {
-  try {
-    const parts = token.split('.');
-    if (parts.length < 2) return null;
-    const payload = JSON.parse(decodeBase64Url(parts[1]));
-    return payload;
-  } catch (_) {
-    return null;
-  }
-}
+// Clerk-compatible JWT verification middleware built on jose.
+const { createRemoteJWKSet, jwtVerify } = require('jose');
 
 function extractUserIdFromPayload(payload) {
   // Prefer standard JWT subject claim used by Clerk
@@ -30,7 +11,33 @@ function extractUserIdFromPayload(payload) {
   return null;
 }
 
-function authMiddleware(req, res, next) {
+const jwksUrl = process.env.CLERK_JWKS_URL || '';
+const issuer = process.env.CLERK_ISSUER || '';
+const audience = process.env.CLERK_AUDIENCE || '';
+
+let jwksFetcher = null;
+if (jwksUrl) {
+  try {
+    jwksFetcher = createRemoteJWKSet(new URL(jwksUrl));
+  } catch (error) {
+    console.error('Invalid CLERK_JWKS_URL provided:', error);
+  }
+}
+
+async function verifyClerkToken(token) {
+  if (!jwksFetcher) {
+    throw new Error('Clerk JWKS not configured');
+  }
+
+  const verifyOptions = {};
+  if (issuer) verifyOptions.issuer = issuer;
+  if (audience) verifyOptions.audience = audience;
+
+  const result = await jwtVerify(token, jwksFetcher, verifyOptions);
+  return result.payload;
+}
+
+async function authMiddleware(req, res, next) {
   const devFallbackEnabled = process.env.ENABLE_DEV_AUTH_FALLBACK === 'true' || process.env.NODE_ENV !== 'production';
 
   // Dev fallback: allow passing user ID directly via header for local dev/testing
@@ -46,18 +53,22 @@ function authMiddleware(req, res, next) {
     return res.status(401).json({ message: 'Unauthorized: missing Bearer token' });
   }
 
-  // NOTE: We are not verifying the signature here due to environment constraints.
-  // In production, verify against Clerk JWKS or use @clerk/express middleware.
-  const payload = parseJwtWithoutVerify(token);
-  const userId = extractUserIdFromPayload(payload || {});
+  try {
+    const payload = await verifyClerkToken(token);
+    const userId = extractUserIdFromPayload(payload || {});
 
-  if (!userId) {
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized: token missing user id' });
+    }
+
+    req.auth = { userId };
+    return next();
+  } catch (error) {
+    if (error.message === 'Clerk JWKS not configured') {
+      return res.status(500).json({ message: 'Server misconfiguration: Clerk JWKS not configured' });
+    }
     return res.status(401).json({ message: 'Unauthorized: invalid token' });
   }
-
-  req.auth = { userId };
-  return next();
 }
 
 module.exports = { authMiddleware };
-

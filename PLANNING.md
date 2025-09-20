@@ -61,7 +61,7 @@ Indexes — COMPLETED
 - Unique: `(sessionId, voterId, points)` to ensure one vote per tier per session.
 - Supportive: indexes on `Vote.sessionId`, `VotingSession.isActive`, `VotingSession.endTime`.
 
-### 2) Authentication and Security
+### 2) Authentication and Security — COMPLETED
 - Local-first: enable dev header `X-Dev-User-Id` via middleware. Controlled by `ENABLE_DEV_AUTH_FALLBACK=true` or non-production env.
 - Clerk webhooks: route present; signature verification — TODO for production.
 - Admin guard: `X-API-Key` required for admin endpoints (`ADMIN_API_KEY`).
