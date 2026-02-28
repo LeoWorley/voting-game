@@ -1,0 +1,127 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY_FRONTEND: ${{ vars.ECR_REPOSITORY_FRONTEND }}
+  ECR_REPOSITORY_BACKEND: ${{ vars.ECR_REPOSITORY_BACKEND }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend_image: ${{ steps.meta.outputs.frontend_image }}
+      backend_image: ${{ steps.meta.outputs.backend_image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push frontend image
+        run: |
+          FRONTEND_IMAGE="${{ steps.login-ecr.outputs.registry }}/${ECR_REPOSITORY_FRONTEND}:${GITHUB_SHA}"
+          docker build -t "$FRONTEND_IMAGE" -f frontend/Dockerfile frontend
+          docker push "$FRONTEND_IMAGE"
+          echo "FRONTEND_IMAGE=$FRONTEND_IMAGE" >> $GITHUB_ENV
+
+      - name: Build and push backend image
+        run: |
+          BACKEND_IMAGE="${{ steps.login-ecr.outputs.registry }}/${ECR_REPOSITORY_BACKEND}:${GITHUB_SHA}"
+          docker build -t "$BACKEND_IMAGE" -f backend/Dockerfile backend
+          docker push "$BACKEND_IMAGE"
+          echo "BACKEND_IMAGE=$BACKEND_IMAGE" >> $GITHUB_ENV
+
+      - name: Expose image metadata
+        id: meta
+        run: |
+          echo "frontend_image=${FRONTEND_IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "backend_image=${BACKEND_IMAGE}" >> "$GITHUB_OUTPUT"
+
+  deploy-dev:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy deployment assets to dev host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEV_HOST }}
+          username: ${{ secrets.DEV_SSH_USER }}
+          key: ${{ secrets.DEV_SSH_KEY }}
+          source: docker-compose.server.yml,infra/scripts/deploy-compose.sh
+          target: /opt/voting-game
+
+      - name: Deploy to dev
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_HOST }}
+          username: ${{ secrets.DEV_SSH_USER }}
+          key: ${{ secrets.DEV_SSH_KEY }}
+          script_stop: true
+          envs: AWS_REGION
+          script: |
+            export AWS_REGION='${{ env.AWS_REGION }}'
+            export SECRETS_ID='${{ secrets.DEV_SECRETS_ID }}'
+            export FRONTEND_IMAGE='${{ needs.build-and-push.outputs.frontend_image }}'
+            export BACKEND_IMAGE='${{ needs.build-and-push.outputs.backend_image }}'
+            export APP_DIR='/opt/voting-game'
+            cd /opt/voting-game
+            bash infra/scripts/deploy-compose.sh
+
+  deploy-prod:
+    needs: [build-and-push, deploy-dev]
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy deployment assets to prod host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          source: docker-compose.server.yml,infra/scripts/deploy-compose.sh
+          target: /opt/voting-game
+
+      - name: Deploy to prod
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script_stop: true
+          envs: AWS_REGION
+          script: |
+            export AWS_REGION='${{ env.AWS_REGION }}'
+            export SECRETS_ID='${{ secrets.PROD_SECRETS_ID }}'
+            export FRONTEND_IMAGE='${{ needs.build-and-push.outputs.frontend_image }}'
+            export BACKEND_IMAGE='${{ needs.build-and-push.outputs.backend_image }}'
+            export APP_DIR='/opt/voting-game'
+            cd /opt/voting-game
+            bash infra/scripts/deploy-compose.sh
