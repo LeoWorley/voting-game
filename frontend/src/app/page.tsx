@@ -1,52 +1,46 @@
-import { UserButton } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
-import Link from "next/link";
+'use client';
 
-export default async function Home() {
-  const { userId } = await auth();
+import Link from 'next/link';
+import { UserButton, useAuth } from '@clerk/nextjs';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { useI18n } from '@/i18n/useI18n';
+
+export default function HomePage() {
+  const { t } = useI18n();
+  const { userId, isLoaded } = useAuth();
+
+  if (!isLoaded) {
+    return <div className="p-8 text-gray-700">{t('loading')}</div>;
+  }
 
   return (
-    <div className="min-h-screen p-8">
-      <header className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold">Voting Game</h1>
-        <div>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <header className="mx-auto mb-8 flex w-full max-w-5xl items-center justify-between">
+        <h1 className="text-2xl font-bold">{t('appName')}</h1>
+        <div className="flex items-center gap-3">
+          <LanguageSwitcher />
           {userId ? (
             <UserButton afterSignOutUrl="/" />
           ) : (
-            <div className="space-x-4">
-              <Link 
-                href="/sign-in"
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                Sign In
+            <div className="space-x-2">
+              <Link className="rounded bg-blue-600 px-4 py-2 text-white" href="/sign-in">
+                {t('signIn')}
               </Link>
-              <Link 
-                href="/sign-up"
-                className="px-4 py-2 border border-blue-500 text-blue-500 rounded hover:bg-blue-50"
-              >
-                Sign Up
+              <Link className="rounded border border-blue-600 px-4 py-2 text-blue-600" href="/sign-up">
+                {t('signUp')}
               </Link>
             </div>
           )}
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto">
+      <main className="mx-auto max-w-3xl rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm">
+        <h2 className="mb-4 text-2xl font-semibold">{userId ? t('homeSignedInTitle') : t('homeSignedOutTitle')}</h2>
         {userId ? (
-          <div className="text-center">
-            <h2 className="text-xl mb-4">Welcome to the Voting Game!</h2>
-            <Link 
-              href="/dashboard"
-              className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600"
-            >
-              Go to Dashboard
-            </Link>
-          </div>
-        ) : (
-          <div className="text-center">
-            <h2 className="text-xl mb-4">Please sign in to participate in the game</h2>
-          </div>
-        )}
+          <Link className="inline-block rounded bg-green-600 px-6 py-3 font-medium text-white" href="/dashboard">
+            {t('goToDashboard')}
+          </Link>
+        ) : null}
       </main>
     </div>
   );

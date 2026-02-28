@@ -1,67 +1,55 @@
-import { VotingResult } from '@/services/api';
+'use client';
+
+import { LatestResultsResponse } from '@/services/api';
+import { useI18n } from '@/i18n/useI18n';
 
 type VotingResultsProps = {
-  results: VotingResult | null;
+  results: LatestResultsResponse;
 };
 
 export function VotingResults({ results }: VotingResultsProps) {
-  if (!results) {
-    return (
-      <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-        <p className="text-gray-600 dark:text-gray-300">Aún no hay resultados de votación disponibles. Vuelve a consultar después de que finalice el período de votación.</p>
-      </div>
-    );
+  const { t } = useI18n();
+
+  if (!results.session) {
+    return <p className="text-sm text-gray-600">{t('noResults')}</p>;
   }
 
-  const { eliminatedPlayer, votes, votingDate } = results;
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          Resultados para {new Date(votingDate).toLocaleDateString()}
-        </h3>
-        {eliminatedPlayer ? (
-          <p className="mt-2 text-lg font-semibold text-red-600 dark:text-red-400">
-            Jugador Eliminado: {eliminatedPlayer.username}
+        <p className="text-sm text-gray-600">
+          {t('resultsDate')}: {results.session.name}
+        </p>
+        {results.session.eliminatedUser ? (
+          <p className="text-lg font-semibold text-red-700">
+            {t('eliminatedPlayer')}: {results.session.eliminatedUser.username}
           </p>
         ) : (
-          <p className="mt-2 text-lg font-semibold text-green-600 dark:text-green-400">
-            Ningún jugador fue eliminado en esta ronda.
-          </p>
+          <p className="text-lg font-semibold text-green-700">{t('noElimination')}</p>
         )}
       </div>
 
       <div className="overflow-x-auto">
-        <h4 className="text-md font-medium text-gray-900 dark:text-white mb-2">Desglose de Votos</h4>
-        <div className="align-middle inline-block min-w-full">
-          <div className="shadow overflow-hidden border-b border-gray-200 dark:border-gray-700 sm:rounded-lg">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Votante</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Votó Por</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tipo de Voto</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Razón</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {votes.map((vote, index) => (
-                  <tr key={index}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{vote.voter}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{vote.votedFor}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${vote.type === 'PRIMARY' ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800'}`}>
-                        {vote.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-normal text-sm text-gray-500 dark:text-gray-400">{vote.reason || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <table className="min-w-full divide-y divide-gray-200 rounded border border-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs uppercase tracking-wide text-gray-500">Player</th>
+              <th className="px-3 py-2 text-left text-xs uppercase tracking-wide text-gray-500">{t('primaryVotes')}</th>
+              <th className="px-3 py-2 text-left text-xs uppercase tracking-wide text-gray-500">{t('secondaryVotes')}</th>
+              <th className="px-3 py-2 text-left text-xs uppercase tracking-wide text-gray-500">{t('points')}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 bg-white">
+            {results.session.scoreboard.map((row) => (
+              <tr key={row.userId}>
+                <td className="px-3 py-2 text-sm text-gray-900">{row.username}</td>
+                <td className="px-3 py-2 text-sm text-gray-600">{row.primaryVotes}</td>
+                <td className="px-3 py-2 text-sm text-gray-600">{row.secondaryVotes}</td>
+                <td className="px-3 py-2 text-sm font-semibold text-gray-900">{row.totalPoints}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

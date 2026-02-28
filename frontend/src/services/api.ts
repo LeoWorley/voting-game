@@ -1,96 +1,290 @@
+export type Locale = 'en' | 'es';
+
+export class ApiError extends Error {
+  code: string;
+  status: number;
+  details?: unknown;
+
+  constructor(message: string, code: string, status: number, details?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+    this.status = status;
+    this.details = details;
+  }
+}
+
 export type Player = {
   id: string;
   username: string;
+  imageUrl: string;
 };
 
-type VotingStatus = {
-  isVotingDay: boolean;
-  nextVotingDate: Date;
-  isPlayerActive: boolean;
-  remainingPlayers: number;
-  eligiblePlayers: Player[];
-};
-
-type VoteDetail = {
-  voter: string;
-  votedFor: string;
-  reason: string;
-  type: 'PRIMARY' | 'SECONDARY';
-}
-
-export type VotingResult = {
-  eliminatedPlayer: {
-    username: string;
+export type VotingStatus = {
+  isVotingOpen: boolean;
+  session: {
+    id: string;
+    name: string;
+    startTime: string;
+    endTime: string;
   } | null;
-  votes: VoteDetail[];
-  votingDate: Date;
+  eligiblePlayers: Player[];
+  me: {
+    id: string;
+    clerkId: string;
+    username: string;
+    isActive: boolean;
+  };
+  stats: {
+    remainingPlayers: number;
+  };
 };
 
-type VotePayload = {
+export type UserVotes = {
+  sessionId: string | null;
+  primaryVote: {
+    targetUserId: string;
+    reason: string;
+    updatedAt: string;
+  } | null;
+  secondaryVote: {
+    targetUserId: string;
+    reason: string;
+    updatedAt: string;
+  } | null;
+};
+
+export type ScoreboardRow = {
   userId: string;
-  reason: string;
+  username: string;
+  imageUrl: string;
+  primaryVotes: number;
+  secondaryVotes: number;
+  totalPoints: number;
 };
 
-const url = process.env.NEXT_PUBLIC_API_BASE_URL || 5050;
+export type SessionSummary = {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  eliminatedUser: {
+    id: string;
+    username: string;
+    imageUrl: string;
+  } | null;
+  scoreboard: ScoreboardRow[];
+};
 
-type AuthOpts = { devUserId?: string; token?: string };
+export type LatestResultsResponse = {
+  session: SessionSummary | null;
+};
+
+export type SessionHistoryEntry = {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  eliminatedUser: {
+    id: string;
+    username: string;
+    imageUrl: string;
+  } | null;
+};
+
+export type AggregateResultsResponse = {
+  session: {
+    id: string;
+    name: string;
+    startTime: string;
+    endTime: string;
+    isActive: boolean;
+    eliminatedUser: string | null;
+  };
+  scoreboard: ScoreboardRow[];
+};
+
+export type DetailedVote = {
+  id: string;
+  sessionId: string;
+  points: number;
+  reason: string;
+  voter: {
+    id: string;
+    username: string;
+    imageUrl: string;
+  } | null;
+  votedFor: {
+    id: string;
+    username: string;
+    imageUrl: string;
+  } | null;
+};
+
+export type CloseSessionResponse = {
+  code: string;
+  message: string;
+  session: {
+    id: string;
+    name: string;
+    startTime: string;
+    endTime: string;
+    isActive: boolean;
+  };
+  eliminatedUser: {
+    id: string;
+    username: string;
+    imageUrl: string;
+  } | null;
+  tieBreak: {
+    eliminatedUserId: string;
+    method: string;
+    tiedUserIds: string[];
+  };
+  scoreboard: ScoreboardRow[];
+  nextSession: {
+    id: string;
+    name: string;
+    startTime: string;
+    endTime: string;
+    isActive: boolean;
+  } | null;
+};
+
+type AuthOpts = {
+  devUserId?: string;
+  token?: string;
+  adminApiKey?: string;
+};
+
+const devUserOverride = process.env.NEXT_PUBLIC_DEV_USER_ID;
+
+function resolveApiBaseUrl() {
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (configured) {
+    return configured.endsWith('/') ? configured.slice(0, -1) : configured;
+  }
+
+  if (typeof window === 'undefined') {
+    return process.env.INTERNAL_API_BASE_URL || 'http://localhost:5050';
+  }
+
+  return '';
+}
 
 function buildHeaders(base?: Record<string, string>, opts?: AuthOpts): HeadersInit {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(base || {})
+    ...(base || {}),
   };
+
+  const devUserId = devUserOverride || opts?.devUserId;
   if (opts?.token) {
-    headers['Authorization'] = `Bearer ${opts.token}`;
-  } else if (opts?.devUserId) {
-    headers['X-Dev-User-Id'] = opts.devUserId;
+    headers.Authorization = `Bearer ${opts.token}`;
+  } else if (devUserId) {
+    headers['X-Dev-User-Id'] = devUserId;
   }
+
+  if (opts?.adminApiKey) {
+    headers['X-API-Key'] = opts.adminApiKey;
+  }
+
   return headers;
 }
 
-export const api = {
-  async getVotingStatus(opts?: AuthOpts): Promise<VotingStatus> {
-    const response = await fetch(`${url}/api/voting/status`, {
-      headers: buildHeaders(undefined, opts)
-    });
-    if (!response.ok) {
-      throw new Error('Failed to fetch voting status');
-    }
-    const data = await response.json();
-    return {
-      ...data,
-      nextVotingDate: new Date(data.nextVotingDate)
-    };
-  },
+async function parseResponse<T>(response: Response): Promise<T> {
+  const isJson = response.headers.get('content-type')?.includes('application/json');
+  const payload = isJson ? await response.json() : null;
 
-  async submitVotes(primaryVote: VotePayload, secondaryVote: VotePayload, opts?: AuthOpts): Promise<void> {
-    const response = await fetch(`${url}/api/votes`, {
-      method: 'POST',
-      headers: buildHeaders(undefined, opts),
-      body: JSON.stringify({
-        primaryVote,
-        secondaryVote,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({ message: 'Failed to submit votes' }));
-      throw new Error(errorBody.message || 'Failed to submit votes');
-    }
-  },
-
-  async getLatestResults(): Promise<VotingResult | null> {
-    const response = await fetch(`${url}/api/results/latest`);
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
-      }
-      throw new Error('Failed to fetch latest results');
-    }
-    const data = await response.json();
-    return {
-        ...data,
-        votingDate: new Date(data.votingDate)
-    };
+  if (!response.ok) {
+    throw new ApiError(
+      payload?.message || `Request failed with status ${response.status}`,
+      payload?.code || 'REQUEST_FAILED',
+      response.status,
+      payload?.details
+    );
   }
+
+  return payload as T;
+}
+
+async function request<T>(path: string, init?: RequestInit, opts?: AuthOpts): Promise<T> {
+  const url = `${resolveApiBaseUrl()}${path}`;
+  const headers = buildHeaders(init?.headers as Record<string, string>, opts);
+  return parseResponse<T>(
+    await fetch(url, {
+      ...init,
+      headers,
+      cache: 'no-store',
+    })
+  );
+}
+
+export const api = {
+  getVotingStatus(opts?: AuthOpts) {
+    return request<VotingStatus>('/api/voting/status', undefined, opts);
+  },
+
+  submitVotes(primaryVote: { userId: string; reason?: string }, secondaryVote: { userId: string; reason?: string }, opts?: AuthOpts) {
+    return request<{ code: string; message: string; sessionId: string }>(
+      '/api/votes',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ primaryVote, secondaryVote }),
+      },
+      opts
+    );
+  },
+
+  getMyVotes(sessionId = 'current', opts?: AuthOpts) {
+    const query = encodeURIComponent(sessionId);
+    return request<UserVotes>(`/api/votes/me?sessionId=${query}`, undefined, opts);
+  },
+
+  getLatestResults() {
+    return request<LatestResultsResponse>('/api/results/latest');
+  },
+
+  getAggregateResults(sessionId: string) {
+    return request<AggregateResultsResponse>(`/api/results/aggregate/${sessionId}`);
+  },
+
+  getSessionHistory() {
+    return request<{ sessions: SessionHistoryEntry[] }>('/api/sessions/history');
+  },
+
+  getDetailedResults(sessionId: string, opts?: AuthOpts) {
+    return request<{ votes: DetailedVote[] }>(`/api/admin/detailed-results/${sessionId}`, undefined, opts);
+  },
+
+  openSession(payload: { name?: string; startTime: string; endTime: string }, opts?: AuthOpts) {
+    return request<{ code: string; message: string; session: { id: string; name: string; startTime: string; endTime: string; isActive: boolean } }>(
+      '/api/admin/sessions/open',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      opts
+    );
+  },
+
+  closeAndEliminate(
+    payload: {
+      manualTieBreakUserId?: string;
+      openNextSession?: boolean;
+      nextSession?: { name?: string; startTime: string; endTime: string };
+    },
+    opts?: AuthOpts
+  ) {
+    return request<CloseSessionResponse>(
+      '/api/admin/sessions/close-and-eliminate',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      opts
+    );
+  },
 };
