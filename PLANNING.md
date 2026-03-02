@@ -1,170 +1,177 @@
-# Development Plan: "Big Brother" Style Voting Game
+# Voting Game Execution Checklist
 
-This plan describes the local-first web app for a weekly elimination game (Big Brother-like) to be used with coworkers, and the path to a hardened deployment.
+This file tracks implementation progress for the full scope (product + infrastructure) with bilingual support and senior git workflow.
 
----
+## Scope
 
-## Language and Documentation Policy
-- All code comments and documentation are in English.
-- UI language: currently Spanish copy exists; standardize on English for now or introduce i18n (simple dictionary) when time permits.
+- Gameplay and session lifecycle completion
+- Canonical backend API contracts
+- English + Spanish localization
+- Frontend dashboard/admin completion
+- Automated quality gates (lint/typecheck/test/build)
+- Docker + AWS CI/CD scaffolding
+- Secrets/logging/domain+HTTPS deployment plan
+- Conventional commits + branch policy enforcement
 
----
+## Milestones
 
-## Game Rules and Mechanics
+### 1) Baseline Stabilization
 
-### Voting
-- Each player casts 2 votes per session: Primary (2 pts) and Secondary (1 pt).
-- Cannot vote for self. Primary and Secondary must target different users.
-- Votes can be edited until the session closes.
+Status: ✅ Completed
 
-### Tie-breakers
-Deterministic, documented order:
-1) Highest total points
-2) Most primary (2-point) votes
-3) Earliest final submission timestamp by the tied target (when the last vote affecting them was submitted)
-4) Admin decision (recorded in audit log)
+- Removed stale duplicate frontend component path that broke builds.
+- Normalized API client behavior and contract types.
+- Added backend CORS configuration with `ALLOWED_ORIGINS`.
+- Restored green local pipeline for lint/type/test/build.
 
-### Visibility
-- Public (or all players): anonymized session results (scores per player, eliminated user).
-- Admin-only: detailed results (who voted for whom with reasons).
+Acceptance gate:
 
----
+- `npm run ci` passes locally.
 
-## Phase 1: Backend (Node.js + Express + Mongoose) — IN PROGRESS
+### 2) Backend Feature Completion
 
-The backend manages game logic, data, and security.
+Status: ✅ Completed
 
-### 1) Data Models — COMPLETED (current)
+Implemented endpoints:
 
-`User`
-- `clerkId: String` — unique external ID
-- `username: String`
-- `imageUrl: String`
-- `status: 'active' | 'eliminated'`
-- `eliminationSession: ObjectId | null`
+- `GET /api/voting/status`
+- `POST /api/votes`
+- `GET /api/votes/me`
+- `GET /api/results/latest`
+- `GET /api/results/aggregate/:sessionId`
+- `GET /api/sessions/history`
+- `GET /api/admin/detailed-results/:sessionId`
+- `POST /api/admin/sessions/open`
+- `POST /api/admin/sessions/close-and-eliminate`
 
-`VotingSession`
-- `name: String`
-- `startTime: Date`
-- `endTime: Date`
-- `isActive: Boolean`
-- `eliminatedUser: ObjectId | null`
+Implemented server-side rules:
 
-`Vote`
-- `sessionId: ObjectId`
-- `voterId: ObjectId`
-- `votedForId: ObjectId`
-- `points: 1 | 2`
-- `reason: String`
+- no self-voting
+- primary/secondary must differ
+- active voter + active targets only
+- vote editing via upsert while session is open
+- deterministic tie-break flow with manual admin fallback
 
-Indexes — COMPLETED
-- Unique: `(sessionId, voterId, points)` to ensure one vote per tier per session.
-- Supportive: indexes on `Vote.sessionId`, `VotingSession.isActive`, `VotingSession.endTime`.
+Added:
 
-### 2) Authentication and Security — COMPLETED
-- Local-first: enable dev header `X-Dev-User-Id` via middleware. Controlled by `ENABLE_DEV_AUTH_FALLBACK=true` or non-production env.
-- Clerk webhooks: route present; signature verification — TODO for production.
-- Admin guard: `X-API-Key` required for admin endpoints (`ADMIN_API_KEY`).
+- `AuditLog` model
+- centralized `game.service`
+- standardized backend errors: `{ code, message, details? }`
 
-### 3) API Endpoints — STATUS
+### 3) Canonical API Contracts
 
-Auth & Users
-- `POST /api/users/sync` — Clerk webhook to upsert users. Status: implemented; signature verification — TODO.
+Status: ✅ Completed
 
-Voting
-- `GET /api/voting/status` — canonical contract to unify frontend/back:
-  - Response: `{ isVotingOpen: boolean, startTime?: Date, endTime?: Date, sessionName?: string, eligiblePlayers: Array<{ id, username, imageUrl }>, me: { clerkId: string, isActive: boolean } }`
-  - Status: implemented (currently returns `isVotingActive`, `startTime`, `endTime`, `sessionName`, `eligiblePlayers`). TODO: align naming and include `me`.
-- `POST /api/votes` — submit primary (2 pts) and secondary (1 pt) votes; idempotent upsert per tier. Status: completed.
-- `GET /api/votes/me?sessionId=current` — retrieve current user’s votes for the active session to support editing. Status: TODO.
+Canonical payloads now include:
 
-Results
-- `GET /api/results/latest` — latest closed session with eliminated user. Status: completed.
-- `GET /api/results/aggregate/:sessionId` — anonymized counts per target (primary, secondary, total). Status: TODO.
-- `GET /api/admin/detailed-results/:sessionId` — full vote details; `X-API-Key` protected. Status: completed.
+- status: `isVotingOpen`, `session`, `eligiblePlayers`, `me`, `stats`
+- my votes: `primaryVote`, `secondaryVote`
+- latest and aggregate results with scoreboard rows
+- admin lifecycle responses with tie-break metadata
 
-Session Lifecycle (admin)
-- `POST /api/admin/sessions/open` — create/open a new session. Status: TODO.
-- `POST /api/admin/sessions/close-and-eliminate` — close active session, compute totals with tie-breakers, set eliminated user, mark users, open next session (optional). Status: TODO.
-- `GET /api/sessions/history` — list sessions with eliminated user. Status: TODO.
+### 4) Multilingual (`en` + `es`)
 
-### 4) Operational Concerns
-- CORS for local dev: allow `http://localhost:3000`. Status: TODO.
-- Transactions: optional MongoDB transaction wrapping dual upserts for strict atomicity; current unique-index approach is acceptable locally. Status: optional/TODO.
-- Audit log: record admin actions (session open/close, manual tie-break). Status: TODO.
+Status: ✅ Completed
 
----
+- Added i18n dictionaries and typed key system.
+- Added global language switcher.
+- Persisted locale in localStorage + cookie.
+- Localized dashboard, home, voting form, results, admin panel.
+- Backend remains language-agnostic with stable error codes for frontend mapping.
 
-## Phase 2: Frontend (Next.js + React) — PLANNED
+### 5) Frontend Completion
 
-Pages & Components
-- Auth (`/sign-in`, `/sign-up`) — maintain Clerk for now; support dev-mode header in API client for local.
-- Dashboard (`/dashboard`)
-  - Calls `GET /api/voting/status`.
-  - If open and user active: show voting form with eligible players; pre-fill current votes via `GET /api/votes/me` to allow edit.
-  - If closed: show latest results and link to history.
-- Results (`/results`) — history of sessions with eliminated players and aggregate scores.
-- Admin (local) (`/admin`) — minimal controls: open session, close+eliminate (runs the algorithm), view aggregates.
+Status: ✅ Completed
 
-UX Notes
-- Disable form for eliminated users or when window closed.
-- Reasons are optional; display where appropriate.
-- Language consistency: keep UI copy in English (or add i18n switch if needed).
+- Dashboard now supports:
+  - canonical status contract
+  - editable votes with preload
+  - open/closed rendering
+  - history rendering
+- Added `/admin` page with:
+  - API key input
+  - open-session action
+  - close-and-eliminate action
+  - optional open-next-session payload
+  - detailed vote retrieval per session
 
----
+### 6) Testing + Quality Gates
 
-## Phase 3: Automation — PLANNED
+Status: ✅ Completed
 
-Start manual, then automate.
+Backend:
 
-Manual-first
-- Admin triggers `close-and-eliminate` weekly; the endpoint computes totals, applies tie-breakers, marks elimination, and optionally opens the next session.
+- Jest + Supertest + mongodb-memory-server integration tests
 
-Cron (later)
-- Weekly schedule (e.g., Saturday 22:00 in a chosen timezone) to run the same logic as the manual endpoint. Ensure idempotency (safe re-runs).
+Frontend:
 
----
+- Vitest unit test coverage started for i18n/dictionary behavior
 
-## Security and Constraints Checklist
+CI gate command:
 
-- Clerk authentication on routes — Completed (middleware; dev fallback via `X-Dev-User-Id`).
-- Frontend sends dev header locally — Completed.
-- Admin protection for detailed results — Completed (`X-API-Key`).
-- Verify Clerk webhook signatures — TODO (`/api/users/sync`).
-- Enforce voting constraints server-side — Completed (active window; primary+secondary; distinct targets; no self; targets active; upsert policy and unique index).
-- Indexes — Completed (unique and supportive indexes in place).
-- CORS for local dev — TODO.
+- `npm run ci`
 
-Auth Hardening for Prod
-- Replace dev fallback with verified Clerk auth (@clerk/express or JWKS verification).
-- Frontend uses real `Authorization: Bearer` token instead of dev header in prod.
+### 7) Dockerization
 
----
+Status: ✅ Completed
 
-## Observability and Auditing — PLANNED
-- Structured logs for vote submissions, session open/close, and admin actions.
-- Minimal `audits` collection: `{ actor, action, target, metadata, createdAt }`.
+- Added `backend/Dockerfile`
+- Added `frontend/Dockerfile`
+- Added `docker-compose.yml` for local
+- Added `docker-compose.server.yml` for EC2 runtime
 
----
+### 8) AWS CI/CD
 
-## Testing Plan — PLANNED
-- Unit tests: vote constraints (no self, unique tiers, active targets), status endpoint contract, tie-breaker function.
-- Integration test: end-to-end session close-and-eliminate with deterministic tie cases.
-- Seeded local data for reproducible smoke tests.
+Status: ✅ Completed (scaffold)
 
----
+Added workflows:
 
-## Documentation & DevX — PLANNED
-- README updates:
-  - Add envs: `ADMIN_API_KEY`, `ENABLE_DEV_AUTH_FALLBACK=true`.
-  - Local quickstart: seed users, open session, submit votes, close session, view results.
-  - Note CORS setup for local.
-- Remove or implement Socket.IO reference (keep only if realtime UI planned).
+- `.github/workflows/ci.yml`
+- `.github/workflows/commitlint.yml`
+- `.github/workflows/deploy.yml`
 
----
+Deployment flow:
 
-## Future Considerations
-- Add role on `User` for richer admin controls when Clerk is fully integrated.
-- Realtime updates (Socket.IO or SSE) on results or session status.
-- i18n support for bilingual teams.
-- Export reports per session (CSV or JSON) for retrospectives.
+- Build/push images to ECR
+- Deploy to `dev`
+- Deploy to `prod` (via GitHub Environment approval)
+
+### 9) Secrets, Logs, Domain, HTTPS
+
+Status: ✅ Completed (runbook + scaffolding)
+
+- Added `infra/scripts/deploy-compose.sh` to pull runtime secrets from AWS Secrets Manager.
+- Backend logs are structured JSON to stdout (CloudWatch-ready).
+- Route53 + ACM + ALB approach documented in README.
+
+### 10) Documentation and Workflow Policy
+
+Status: ✅ Completed
+
+- Updated README with full local/devops runbook.
+- Added Conventional Commit enforcement in CI.
+- Added local optional commit hook and branching policy guidance.
+
+## Remaining Manual Infrastructure Tasks
+
+These are intentionally manual for this phase (no Terraform):
+
+- Provision ECR repos (frontend/backend).
+- Provision EC2 hosts and install Docker + AWS CLI + jq.
+- Configure IAM/OIDC role for GitHub Actions.
+- Create AWS Secrets Manager entries (`dev`/`prod`).
+- Configure Route53 records and ACM certificates.
+- Configure ALB listeners + target groups + HTTPS redirect.
+- Add CloudWatch agent and alarms.
+- Configure GitHub environments (`dev`, `prod`) and required approvals.
+
+## Acceptance Criteria Snapshot
+
+- Vote constraints enforced server-side.
+- Editable votes supported by `GET /api/votes/me`.
+- Tie-break logic deterministic with manual fallback path.
+- Admin routes protected by `X-API-Key`.
+- Public results do not expose per-voter mappings.
+- Language switching works and persists.
+- CI gate (`lint`, `typecheck`, `test`, `build`) is green.
+- Docker and deployment workflows are present and documented.

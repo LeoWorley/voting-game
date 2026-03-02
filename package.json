@@ -1,18 +1,24 @@
 {
-    "name": "voting-game",
-    "private": true,
-    "workspaces": [
-      "frontend",
-      "backend"
-    ],
-    "scripts": {
-      "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
-      "dev:frontend": "npm run dev --workspace=frontend",
-      "dev:backend": "npm run dev --workspace=backend",
-      "build": "npm run build --workspace=frontend",
-      "start": "npm run start --workspace=backend"
-    },
-    "devDependencies": {
-      "concurrently": "^8.2.2"
-    }
+  "name": "voting-game",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "lint": "npm run lint --workspace=frontend && npm run lint --workspace=backend",
+    "typecheck": "npm run typecheck --workspace=frontend",
+    "test": "npm run test --workspace=backend && npm run test --workspace=frontend",
+    "build": "npm run build --workspace=frontend",
+    "start": "npm run start --workspace=backend",
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.0.0",
+    "concurrently": "^8.2.2"
   }
+}

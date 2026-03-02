@@ -1,10 +1,7 @@
-// Clerk-compatible JWT verification middleware built on jose.
 const { createRemoteJWKSet, jwtVerify } = require('jose');
 
 function extractUserIdFromPayload(payload) {
-  // Prefer standard JWT subject claim used by Clerk
   if (payload?.sub) return payload.sub;
-  // Fallbacks in case different claim names are used
   if (payload?.user_id) return payload.user_id;
   if (payload?.uid) return payload.uid;
   if (payload?.id) return payload.id;
@@ -26,7 +23,7 @@ if (jwksUrl) {
 
 async function verifyClerkToken(token) {
   if (!jwksFetcher) {
-    throw new Error('Clerk JWKS not configured');
+    throw new Error('CLERK_JWKS_NOT_CONFIGURED');
   }
 
   const verifyOptions = {};
@@ -40,17 +37,16 @@ async function verifyClerkToken(token) {
 async function authMiddleware(req, res, next) {
   const devFallbackEnabled = process.env.ENABLE_DEV_AUTH_FALLBACK === 'true' || process.env.NODE_ENV !== 'production';
 
-  // Dev fallback: allow passing user ID directly via header for local dev/testing
   if (devFallbackEnabled && req.headers['x-dev-user-id']) {
     req.auth = { userId: String(req.headers['x-dev-user-id']) };
     return next();
   }
 
-  const authHeader = req.headers['authorization'] || '';
+  const authHeader = req.headers.authorization || '';
   const [scheme, token] = authHeader.split(' ');
 
   if (!scheme || scheme.toLowerCase() !== 'bearer' || !token) {
-    return res.status(401).json({ message: 'Unauthorized: missing Bearer token' });
+    return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Unauthorized: missing Bearer token' });
   }
 
   try {
@@ -58,16 +54,16 @@ async function authMiddleware(req, res, next) {
     const userId = extractUserIdFromPayload(payload || {});
 
     if (!userId) {
-      return res.status(401).json({ message: 'Unauthorized: token missing user id' });
+      return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Unauthorized: token missing user id' });
     }
 
     req.auth = { userId };
     return next();
   } catch (error) {
-    if (error.message === 'Clerk JWKS not configured') {
-      return res.status(500).json({ message: 'Server misconfiguration: Clerk JWKS not configured' });
+    if (error.message === 'CLERK_JWKS_NOT_CONFIGURED') {
+      return res.status(500).json({ code: 'CLERK_JWKS_NOT_CONFIGURED', message: 'Server misconfiguration: Clerk JWKS not configured' });
     }
-    return res.status(401).json({ message: 'Unauthorized: invalid token' });
+    return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Unauthorized: invalid token' });
   }
 }
 

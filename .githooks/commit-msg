@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v npx >/dev/null 2>&1; then
+  echo "npx is required to run commitlint"
+  exit 1
+fi
+
+npx --no-install commitlint --edit "$1"

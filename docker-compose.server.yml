@@ -1,0 +1,19 @@
+version: '3.9'
+services:
+  backend:
+    image: ${BACKEND_IMAGE}
+    env_file:
+      - ./.env.runtime
+    ports:
+      - '5050:5050'
+    restart: unless-stopped
+
+  frontend:
+    image: ${FRONTEND_IMAGE}
+    env_file:
+      - ./.env.runtime
+    depends_on:
+      - backend
+    ports:
+      - '3000:3000'
+    restart: unless-stopped
