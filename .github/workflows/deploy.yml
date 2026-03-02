@@ -14,6 +14,7 @@ env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   ECR_REPOSITORY_FRONTEND: ${{ vars.ECR_REPOSITORY_FRONTEND }}
   ECR_REPOSITORY_BACKEND: ${{ vars.ECR_REPOSITORY_BACKEND }}
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
 
 jobs:
   build-and-push:
@@ -36,10 +37,21 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Validate required build env
+        run: |
+          if [ -z "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" ]; then
+            echo "Missing repo variable NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+            exit 1
+          fi
+
       - name: Build and push frontend image
         run: |
           FRONTEND_IMAGE="${{ steps.login-ecr.outputs.registry }}/${ECR_REPOSITORY_FRONTEND}:${GITHUB_SHA}"
-          docker build -t "$FRONTEND_IMAGE" -f frontend/Dockerfile frontend
+          docker build \
+            --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" \
+            -t "$FRONTEND_IMAGE" \
+            -f frontend/Dockerfile \
+            frontend
           docker push "$FRONTEND_IMAGE"
           echo "FRONTEND_IMAGE=$FRONTEND_IMAGE" >> $GITHUB_ENV
 
