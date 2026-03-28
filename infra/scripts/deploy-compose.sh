@@ -40,12 +40,12 @@ run_as_root() {
 ensure_compose() {
   if docker compose version >/dev/null 2>&1; then
     COMPOSE_CMD=(docker compose)
-    return
+    return 0
   fi
 
   if command -v docker-compose >/dev/null 2>&1; then
     COMPOSE_CMD=(docker-compose)
-    return
+    return 0
   fi
 
   if command -v dnf >/dev/null 2>&1; then
@@ -60,16 +60,44 @@ ensure_compose() {
   elif command -v docker-compose >/dev/null 2>&1; then
     COMPOSE_CMD=(docker-compose)
   else
-    echo "Docker Compose is not installed. Install the Docker Compose plugin or docker-compose."
-    exit 1
+    return 1
   fi
+
+  return 0
+}
+
+deploy_with_docker_run() {
+  docker network inspect voting-game >/dev/null 2>&1 || docker network create voting-game >/dev/null
+
+  docker pull "$BACKEND_IMAGE"
+  docker pull "$FRONTEND_IMAGE"
+
+  docker rm -f voting-game-frontend voting-game-backend >/dev/null 2>&1 || true
+
+  docker run -d \
+    --name voting-game-backend \
+    --network voting-game \
+    --restart unless-stopped \
+    --env-file .env.runtime \
+    -p 5050:5050 \
+    "$BACKEND_IMAGE"
+
+  docker run -d \
+    --name voting-game-frontend \
+    --network voting-game \
+    --restart unless-stopped \
+    --env-file .env.runtime \
+    -p 3000:3000 \
+    "$FRONTEND_IMAGE"
 }
 
 ECR_REGISTRY="${FRONTEND_IMAGE%%/*}"
 aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
-ensure_compose
-
-"${COMPOSE_CMD[@]}" -f docker-compose.server.yml pull
-
-"${COMPOSE_CMD[@]}" -f docker-compose.server.yml up -d --remove-orphans
+if ensure_compose; then
+  "${COMPOSE_CMD[@]}" -f docker-compose.server.yml pull
+  "${COMPOSE_CMD[@]}" -f docker-compose.server.yml up -d --remove-orphans
+else
+  echo "Docker Compose is not available on this host. Falling back to plain docker run."
+  deploy_with_docker_run
+fi
