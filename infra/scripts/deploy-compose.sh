@@ -27,14 +27,48 @@ rm -f .env.runtime.json
 export FRONTEND_IMAGE
 export BACKEND_IMAGE
 
-if docker compose version >/dev/null 2>&1; then
-  COMPOSE_CMD=(docker compose)
-elif command -v docker-compose >/dev/null 2>&1; then
-  COMPOSE_CMD=(docker-compose)
-else
-  echo "Docker Compose is not installed. Install the Docker Compose plugin or docker-compose."
-  exit 1
-fi
+run_as_root() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    return 1
+  fi
+}
+
+ensure_compose() {
+  if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker compose)
+    return
+  fi
+
+  if command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker-compose)
+    return
+  fi
+
+  if command -v dnf >/dev/null 2>&1; then
+    run_as_root dnf install -y docker-compose-plugin || true
+  elif command -v apt-get >/dev/null 2>&1; then
+    run_as_root apt-get update || true
+    run_as_root apt-get install -y docker-compose-plugin || true
+  fi
+
+  if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker compose)
+  elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker-compose)
+  else
+    echo "Docker Compose is not installed. Install the Docker Compose plugin or docker-compose."
+    exit 1
+  fi
+}
+
+ECR_REGISTRY="${FRONTEND_IMAGE%%/*}"
+aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+ensure_compose
 
 "${COMPOSE_CMD[@]}" -f docker-compose.server.yml pull
 
