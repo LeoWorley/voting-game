@@ -37,13 +37,6 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Ensure ECR repositories exist
-        run: |
-          aws ecr describe-repositories --repository-names "${ECR_REPOSITORY_FRONTEND}" --region "${AWS_REGION}" \
-            || aws ecr create-repository --repository-name "${ECR_REPOSITORY_FRONTEND}" --region "${AWS_REGION}"
-          aws ecr describe-repositories --repository-names "${ECR_REPOSITORY_BACKEND}" --region "${AWS_REGION}" \
-            || aws ecr create-repository --repository-name "${ECR_REPOSITORY_BACKEND}" --region "${AWS_REGION}"
-
       - name: Validate required build env
         run: |
           if [ -z "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" ]; then
