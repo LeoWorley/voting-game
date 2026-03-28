@@ -79,6 +79,7 @@ deploy_with_docker_run() {
     --network voting-game \
     --restart unless-stopped \
     --env-file .env.runtime \
+    -e PORT=5050 \
     -p 5050:5050 \
     "$BACKEND_IMAGE"
 
@@ -87,6 +88,7 @@ deploy_with_docker_run() {
     --network voting-game \
     --restart unless-stopped \
     --env-file .env.runtime \
+    -e PORT=3000 \
     -p 3000:3000 \
     "$FRONTEND_IMAGE"
 }

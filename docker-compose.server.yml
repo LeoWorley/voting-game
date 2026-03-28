@@ -4,6 +4,8 @@ services:
     image: ${BACKEND_IMAGE}
     env_file:
       - ./.env.runtime
+    environment:
+      PORT: 5050
     ports:
       - '5050:5050'
     restart: unless-stopped
@@ -12,6 +14,8 @@ services:
     image: ${FRONTEND_IMAGE}
     env_file:
       - ./.env.runtime
+    environment:
+      PORT: 3000
     depends_on:
       - backend
     ports:
