@@ -27,6 +27,15 @@ rm -f .env.runtime.json
 export FRONTEND_IMAGE
 export BACKEND_IMAGE
 
-docker compose -f docker-compose.server.yml pull
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE_CMD=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE_CMD=(docker-compose)
+else
+  echo "Docker Compose is not installed. Install the Docker Compose plugin or docker-compose."
+  exit 1
+fi
 
-docker compose -f docker-compose.server.yml up -d --remove-orphans
+"${COMPOSE_CMD[@]}" -f docker-compose.server.yml pull
+
+"${COMPOSE_CMD[@]}" -f docker-compose.server.yml up -d --remove-orphans
