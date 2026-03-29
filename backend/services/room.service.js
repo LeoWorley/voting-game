@@ -36,22 +36,35 @@ async function getOrCreateUserByClerkId(clerkId, profile = {}) {
     throw new AppError(401, 'UNAUTHORIZED', 'Unauthorized');
   }
 
-  const normalizedUsername = String(profile.username || '').trim() || String(clerkId);
+  const normalizedUsername = String(profile.username || '').trim();
   const normalizedImageUrl = String(profile.imageUrl || '').trim();
+  const existingUser = await User.findOne({ clerkId: String(clerkId) });
 
-  return User.findOneAndUpdate(
-    { clerkId: String(clerkId) },
-    {
-      $set: {
-        username: normalizedUsername,
-        imageUrl: normalizedImageUrl,
-      },
-      $setOnInsert: {
-        clerkId: String(clerkId),
-      },
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
+  if (existingUser) {
+    let changed = false;
+
+    if (normalizedUsername && existingUser.username !== normalizedUsername) {
+      existingUser.username = normalizedUsername;
+      changed = true;
+    }
+
+    if (normalizedImageUrl && existingUser.imageUrl !== normalizedImageUrl) {
+      existingUser.imageUrl = normalizedImageUrl;
+      changed = true;
+    }
+
+    if (changed) {
+      await existingUser.save();
+    }
+
+    return existingUser;
+  }
+
+  return User.create({
+    clerkId: String(clerkId),
+    username: normalizedUsername || String(clerkId),
+    imageUrl: normalizedImageUrl,
+  });
 }
 
 async function getRoomAccessByClerkId({ clerkId, roomId }) {

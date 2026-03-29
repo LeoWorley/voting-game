@@ -115,6 +115,16 @@ describe('Room-based voting game API', () => {
     expect(list.body.rooms).toHaveLength(2);
   });
 
+  it('does not overwrite usernames with Clerk ids during room access lookups', async () => {
+    await request(app)
+      .get('/api/rooms/me')
+      .set('X-Dev-User-Id', 'user_alice')
+      .expect(200);
+
+    const storedUser = await User.findOne({ clerkId: 'user_alice' }).lean();
+    expect(storedUser.username).toBe('Alice');
+  });
+
   it('returns room-scoped voting status contract', async () => {
     const response = await request(app)
       .get(`/api/rooms/${room._id}/voting/status`)
