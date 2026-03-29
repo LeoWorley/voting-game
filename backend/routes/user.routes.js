@@ -1,6 +1,8 @@
 const express = require('express');
 const { Webhook } = require('svix');
 const { User } = require('../models');
+const { authMiddleware } = require('../middleware/auth');
+const { ensureCurrentUser } = require('../services/room.service');
 
 const router = express.Router();
 
@@ -72,6 +74,27 @@ router.post('/sync', async (req, res) => {
   }
 
   return res.status(200).json({ code: 'EVENT_IGNORED', message: 'Event handled' });
+});
+
+router.post('/ensure', authMiddleware, async (req, res) => {
+  try {
+    const user = await ensureCurrentUser({
+      clerkId: req.auth?.userId,
+      username: req.body?.username,
+      imageUrl: req.body?.imageUrl,
+    });
+    return res.json({
+      code: 'USER_ENSURED',
+      message: 'User ensured successfully',
+      user,
+    });
+  } catch (error) {
+    return res.status(error.status || 500).json({
+      code: error.code || 'INTERNAL_ERROR',
+      message: error.message || 'Failed to ensure user',
+      ...(error.details !== undefined ? { details: error.details } : {}),
+    });
+  }
 });
 
 module.exports = router;

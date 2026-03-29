@@ -5,11 +5,7 @@ const { authMiddleware } = require('./middleware/auth');
 const { logInfo } = require('./utils/logger');
 
 const userRoutes = require('./routes/user.routes');
-const votingRoutes = require('./routes/game.routes');
-const voteRoutes = require('./routes/vote.routes');
-const resultsRoutes = require('./routes/results.routes');
-const sessionRoutes = require('./routes/session.routes');
-const adminRoutes = require('./routes/admin.routes');
+const roomRoutes = require('./routes/room.routes');
 
 function buildAllowedOrigins() {
   return (process.env.ALLOWED_ORIGINS || 'http://localhost:3000')
@@ -53,11 +49,7 @@ function createApp() {
   );
 
   app.use('/api/users', userRoutes);
-  app.use('/api/voting', authMiddleware, votingRoutes);
-  app.use('/api/votes', authMiddleware, voteRoutes);
-  app.use('/api/results', resultsRoutes);
-  app.use('/api/sessions', sessionRoutes);
-  app.use('/api/admin', adminRoutes);
+  app.use('/api/rooms', authMiddleware, roomRoutes);
 
   app.get('/api/health', (_req, res) => {
     res.json({

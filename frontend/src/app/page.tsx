@@ -2,14 +2,23 @@
 
 import Link from 'next/link';
 import { UserButton, useAuth } from '@clerk/nextjs';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useI18n } from '@/i18n/useI18n';
 
 export default function HomePage() {
   const { t } = useI18n();
   const { userId, isLoaded } = useAuth();
+  const router = useRouter();
 
-  if (!isLoaded) {
+  useEffect(() => {
+    if (isLoaded && userId) {
+      router.replace('/rooms');
+    }
+  }, [isLoaded, router, userId]);
+
+  if (!isLoaded || userId) {
     return <div className="p-8 text-gray-700">{t('loading')}</div>;
   }
 
@@ -35,12 +44,7 @@ export default function HomePage() {
       </header>
 
       <main className="mx-auto max-w-3xl rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm">
-        <h2 className="mb-4 text-2xl font-semibold">{userId ? t('homeSignedInTitle') : t('homeSignedOutTitle')}</h2>
-        {userId ? (
-          <Link className="inline-block rounded bg-green-600 px-6 py-3 font-medium text-white" href="/dashboard">
-            {t('goToDashboard')}
-          </Link>
-        ) : null}
+        <h2 className="mb-4 text-2xl font-semibold">{t('homeSignedOutTitle')}</h2>
       </main>
     </div>
   );

@@ -7,6 +7,7 @@ import { useI18n } from '@/i18n/useI18n';
 import { I18nKey } from '@/i18n/messages';
 
 type VotingFormProps = {
+  roomId: string;
   eligiblePlayers: Player[];
   initialVotes: UserVotes | null;
 };
@@ -28,7 +29,7 @@ function mapApiErrorToKey(error: ApiError): I18nKey {
   }
 }
 
-export function VotingForm({ eligiblePlayers, initialVotes }: VotingFormProps) {
+export function VotingForm({ roomId, eligiblePlayers, initialVotes }: VotingFormProps) {
   const { t } = useI18n();
   const { userId, getToken } = useAuth();
 
@@ -75,6 +76,7 @@ export function VotingForm({ eligiblePlayers, initialVotes }: VotingFormProps) {
     try {
       const token = await getToken();
       await api.submitVotes(
+        roomId,
         { userId: primaryVote, reason: primaryReason },
         { userId: secondaryVote, reason: secondaryReason },
         token ? { token } : { devUserId: userId || undefined }

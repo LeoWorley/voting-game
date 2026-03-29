@@ -1,6 +1,6 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
-const { User, Vote, VotingSession } = require('../models');
+const { User, Room, RoomMember, Vote, VotingSession } = require('../models');
 const { initializeDatabase, closeDatabase } = require('./init-db');
 
 async function seedDatabase() {
@@ -27,11 +27,13 @@ async function seedDatabase() {
   // Reset collections for a clean local sandbox
   await Promise.all([
     Vote.deleteMany({}),
+    RoomMember.deleteMany({}),
     VotingSession.deleteMany({}),
+    Room.deleteMany({}),
     User.deleteMany({}),
   ]);
 
-  await User.insertMany(
+  const insertedUsers = await User.insertMany(
     basePlayers.map(player => ({
       ...player,
       status: 'active',
@@ -39,7 +41,24 @@ async function seedDatabase() {
     }))
   );
 
+  const room = await Room.create({
+    name: 'Main Dev Room',
+    joinCode: 'DEV123',
+    createdBy: insertedUsers[0]._id,
+  });
+
+  await RoomMember.insertMany(
+    insertedUsers.map((user, index) => ({
+      roomId: room._id,
+      userId: user._id,
+      role: index === 0 ? 'host' : 'member',
+      status: 'active',
+      eliminationSession: null,
+    }))
+  );
+
   await VotingSession.create({
+    roomId: room._id,
     name: 'Week 1 Voting',
     startTime: new Date(),
     endTime: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now

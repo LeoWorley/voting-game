@@ -14,10 +14,58 @@ export class ApiError extends Error {
   }
 }
 
+export type AuthOpts = {
+  devUserId?: string;
+  token?: string;
+};
+
 export type Player = {
   id: string;
   username: string;
   imageUrl: string;
+};
+
+export type RoomSummary = {
+  id: string;
+  name: string;
+  joinCode: string;
+  role: 'host' | 'member';
+  membershipStatus: 'active' | 'eliminated';
+  memberCount: number;
+  activeMemberCount: number;
+  hostCount: number;
+  activeSession: {
+    id: string;
+    name: string;
+    startTime: string;
+    endTime: string;
+    isActive: boolean;
+  } | null;
+};
+
+export type RoomMemberSummary = {
+  id: string;
+  username: string;
+  imageUrl: string;
+  role: 'host' | 'member';
+  status: 'active' | 'eliminated';
+  isCurrentUser: boolean;
+};
+
+export type RoomDetail = {
+  id: string;
+  name: string;
+  joinCode: string;
+  role: 'host' | 'member';
+  membershipStatus: 'active' | 'eliminated';
+  activeSession: {
+    id: string;
+    name: string;
+    startTime: string;
+    endTime: string;
+    isActive: boolean;
+  } | null;
+  members: RoomMemberSummary[];
 };
 
 export type VotingStatus = {
@@ -34,6 +82,7 @@ export type VotingStatus = {
     clerkId: string;
     username: string;
     isActive: boolean;
+    role: 'host' | 'member';
   };
   stats: {
     remainingPlayers: number;
@@ -151,12 +200,6 @@ export type CloseSessionResponse = {
   } | null;
 };
 
-type AuthOpts = {
-  devUserId?: string;
-  token?: string;
-  adminApiKey?: string;
-};
-
 const devUserOverride = process.env.NEXT_PUBLIC_DEV_USER_ID;
 
 function resolveApiBaseUrl() {
@@ -182,10 +225,6 @@ function buildHeaders(base?: Record<string, string>, opts?: AuthOpts): HeadersIn
     headers.Authorization = `Bearer ${opts.token}`;
   } else if (devUserId) {
     headers['X-Dev-User-Id'] = devUserId;
-  }
-
-  if (opts?.adminApiKey) {
-    headers['X-API-Key'] = opts.adminApiKey;
   }
 
   return headers;
@@ -220,13 +259,79 @@ async function request<T>(path: string, init?: RequestInit, opts?: AuthOpts): Pr
 }
 
 export const api = {
-  getVotingStatus(opts?: AuthOpts) {
-    return request<VotingStatus>('/api/voting/status', undefined, opts);
+  ensureCurrentUser(payload: { username?: string; imageUrl?: string }, opts?: AuthOpts) {
+    return request<{ code: string; message: string; user: Player & { clerkId: string } }>(
+      '/api/users/ensure',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      opts
+    );
   },
 
-  submitVotes(primaryVote: { userId: string; reason?: string }, secondaryVote: { userId: string; reason?: string }, opts?: AuthOpts) {
+  getMyRooms(opts?: AuthOpts) {
+    return request<{ rooms: RoomSummary[] }>('/api/rooms/me', undefined, opts);
+  },
+
+  createRoom(payload: { name?: string }, opts?: AuthOpts) {
+    return request<{ code: string; message: string; room: RoomSummary }>(
+      '/api/rooms',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      opts
+    );
+  },
+
+  joinRoom(joinCode: string, opts?: AuthOpts) {
+    return request<{ code: string; message: string; room: RoomSummary }>(
+      '/api/rooms/join',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ joinCode }),
+      },
+      opts
+    );
+  },
+
+  getRoom(roomId: string, opts?: AuthOpts) {
+    return request<RoomDetail>(`/api/rooms/${roomId}`, undefined, opts);
+  },
+
+  updateRoomMemberRole(roomId: string, userId: string, role: 'host' | 'member', opts?: AuthOpts) {
+    return request<{ code: string; message: string; member: RoomMemberSummary }>(
+      `/api/rooms/${roomId}/members/${userId}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      },
+      opts
+    );
+  },
+
+  leaveRoom(roomId: string, opts?: AuthOpts) {
+    return request<{ code: string; message: string }>(
+      `/api/rooms/${roomId}/members/me`,
+      {
+        method: 'DELETE',
+      },
+      opts
+    );
+  },
+
+  getVotingStatus(roomId: string, opts?: AuthOpts) {
+    return request<VotingStatus>(`/api/rooms/${roomId}/voting/status`, undefined, opts);
+  },
+
+  submitVotes(roomId: string, primaryVote: { userId: string; reason?: string }, secondaryVote: { userId: string; reason?: string }, opts?: AuthOpts) {
     return request<{ code: string; message: string; sessionId: string }>(
-      '/api/votes',
+      `/api/rooms/${roomId}/votes`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -236,30 +341,30 @@ export const api = {
     );
   },
 
-  getMyVotes(sessionId = 'current', opts?: AuthOpts) {
+  getMyVotes(roomId: string, sessionId = 'current', opts?: AuthOpts) {
     const query = encodeURIComponent(sessionId);
-    return request<UserVotes>(`/api/votes/me?sessionId=${query}`, undefined, opts);
+    return request<UserVotes>(`/api/rooms/${roomId}/votes/me?sessionId=${query}`, undefined, opts);
   },
 
-  getLatestResults() {
-    return request<LatestResultsResponse>('/api/results/latest');
+  getLatestResults(roomId: string, opts?: AuthOpts) {
+    return request<LatestResultsResponse>(`/api/rooms/${roomId}/results/latest`, undefined, opts);
   },
 
-  getAggregateResults(sessionId: string) {
-    return request<AggregateResultsResponse>(`/api/results/aggregate/${sessionId}`);
+  getAggregateResults(roomId: string, sessionId: string, opts?: AuthOpts) {
+    return request<AggregateResultsResponse>(`/api/rooms/${roomId}/results/aggregate/${sessionId}`, undefined, opts);
   },
 
-  getSessionHistory() {
-    return request<{ sessions: SessionHistoryEntry[] }>('/api/sessions/history');
+  getSessionHistory(roomId: string, opts?: AuthOpts) {
+    return request<{ sessions: SessionHistoryEntry[] }>(`/api/rooms/${roomId}/sessions/history`, undefined, opts);
   },
 
-  getDetailedResults(sessionId: string, opts?: AuthOpts) {
-    return request<{ votes: DetailedVote[] }>(`/api/admin/detailed-results/${sessionId}`, undefined, opts);
+  getDetailedResults(roomId: string, sessionId: string, opts?: AuthOpts) {
+    return request<{ votes: DetailedVote[] }>(`/api/rooms/${roomId}/admin/detailed-results/${sessionId}`, undefined, opts);
   },
 
-  openSession(payload: { name?: string; startTime: string; endTime: string }, opts?: AuthOpts) {
+  openSession(roomId: string, payload: { name?: string; startTime: string; endTime: string }, opts?: AuthOpts) {
     return request<{ code: string; message: string; session: { id: string; name: string; startTime: string; endTime: string; isActive: boolean } }>(
-      '/api/admin/sessions/open',
+      `/api/rooms/${roomId}/admin/sessions/open`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -270,6 +375,7 @@ export const api = {
   },
 
   closeAndEliminate(
+    roomId: string,
     payload: {
       manualTieBreakUserId?: string;
       openNextSession?: boolean;
@@ -278,7 +384,7 @@ export const api = {
     opts?: AuthOpts
   ) {
     return request<CloseSessionResponse>(
-      '/api/admin/sessions/close-and-eliminate',
+      `/api/rooms/${roomId}/admin/sessions/close-and-eliminate`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

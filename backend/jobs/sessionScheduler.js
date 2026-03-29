@@ -1,4 +1,4 @@
-const { closeAndEliminate } = require('../services/game.service');
+const { closeExpiredSessions } = require('../services/room-game.service');
 const { logInfo, logWarn, logError } = require('../utils/logger');
 
 function startSessionScheduler() {
@@ -14,25 +14,36 @@ function startSessionScheduler() {
 
   const timer = setInterval(async () => {
     try {
-      const result = await closeAndEliminate({
-        actor: 'scheduler',
-        manualTieBreakUserId: null,
-        openNextSession: false,
-        nextSession: null,
-      });
+      const outcomes = await closeExpiredSessions();
+      outcomes.forEach((outcome) => {
+        if (outcome.error?.code === 'TIE_BREAK_REQUIRED') {
+          logWarn('SCHEDULER_TIE_BREAK_REQUIRED', {
+            roomId: outcome.roomId,
+            tiedUserIds: outcome.error?.details?.tiedUserIds || [],
+          });
+          return;
+        }
 
-      logInfo('SCHEDULER_SESSION_CLOSED', {
-        sessionId: result.session.id,
-        eliminatedUserId: result.eliminatedUser?.id || null,
+        if (outcome.error?.code === 'NO_ACTIVE_SESSION') {
+          return;
+        }
+
+        if (outcome.error) {
+          logError('SCHEDULER_ERROR', {
+            roomId: outcome.roomId,
+            code: outcome.error?.code,
+            message: outcome.error?.message,
+          });
+          return;
+        }
+
+        logInfo('SCHEDULER_SESSION_CLOSED', {
+          roomId: outcome.roomId,
+          sessionId: outcome.result.session.id,
+          eliminatedUserId: outcome.result.eliminatedUser?.id || null,
+        });
       });
     } catch (error) {
-      if (error?.code === 'NO_ACTIVE_SESSION') {
-        return;
-      }
-      if (error?.code === 'TIE_BREAK_REQUIRED') {
-        logWarn('SCHEDULER_TIE_BREAK_REQUIRED', { tiedUserIds: error?.details?.tiedUserIds || [] });
-        return;
-      }
       logError('SCHEDULER_ERROR', { code: error?.code, message: error?.message });
     }
   }, intervalMs);

@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const votingSessionSchema = new mongoose.Schema({
+  roomId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Room',
+    required: true,
+  },
   name: {
     type: String,
     required: true
@@ -27,6 +32,10 @@ const votingSessionSchema = new mongoose.Schema({
 });
 
 // Speed up queries for active session checks
+votingSessionSchema.index({ roomId: 1, isActive: 1 }, {
+  unique: true,
+  partialFilterExpression: { isActive: true },
+});
 votingSessionSchema.index({ isActive: 1 });
 votingSessionSchema.index({ endTime: -1 });
 
