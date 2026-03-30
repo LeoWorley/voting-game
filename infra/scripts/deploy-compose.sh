@@ -66,8 +66,44 @@ ensure_compose() {
   return 0
 }
 
+cleanup_old_app_images() {
+  local protected_images=("$FRONTEND_IMAGE" "$BACKEND_IMAGE")
+  local running_image
+  local repositories=("${FRONTEND_IMAGE%:*}" "${BACKEND_IMAGE%:*}")
+
+  for container_name in voting-game-frontend voting-game-backend; do
+    running_image="$(docker container inspect --format '{{.Config.Image}}' "$container_name" 2>/dev/null || true)"
+    if [ -n "$running_image" ]; then
+      protected_images+=("$running_image")
+    fi
+  done
+
+  docker image prune -f >/dev/null 2>&1 || true
+  docker builder prune -f >/dev/null 2>&1 || true
+
+  for repository in "${repositories[@]}"; do
+    while IFS= read -r image_ref; do
+      [ -z "$image_ref" ] && continue
+
+      local keep_image=false
+      for protected in "${protected_images[@]}"; do
+        if [ "$image_ref" = "$protected" ]; then
+          keep_image=true
+          break
+        fi
+      done
+
+      if [ "$keep_image" = false ]; then
+        docker image rm -f "$image_ref" >/dev/null 2>&1 || true
+      fi
+    done < <(docker image ls --format '{{.Repository}}:{{.Tag}}' "$repository" | grep -v '<none>' || true)
+  done
+}
+
 deploy_with_docker_run() {
   docker network inspect voting-game >/dev/null 2>&1 || docker network create voting-game >/dev/null
+
+  cleanup_old_app_images
 
   docker pull "$BACKEND_IMAGE"
   docker pull "$FRONTEND_IMAGE"
@@ -91,14 +127,18 @@ deploy_with_docker_run() {
     -e PORT=3000 \
     -p 3000:3000 \
     "$FRONTEND_IMAGE"
+
+  cleanup_old_app_images
 }
 
 ECR_REGISTRY="${FRONTEND_IMAGE%%/*}"
 aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
 if ensure_compose; then
+  cleanup_old_app_images
   "${COMPOSE_CMD[@]}" -f docker-compose.server.yml pull
   "${COMPOSE_CMD[@]}" -f docker-compose.server.yml up -d --remove-orphans
+  cleanup_old_app_images
 else
   echo "Docker Compose is not available on this host. Falling back to plain docker run."
   deploy_with_docker_run
