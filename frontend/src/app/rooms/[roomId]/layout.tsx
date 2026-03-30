@@ -1,10 +1,9 @@
 'use client';
 
-import Link from 'next/link';
-import { UserButton, useAuth } from '@clerk/nextjs';
+import { useAuth } from '@clerk/nextjs';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { AppNavbar } from '@/components/AppNavbar';
 import { api, RoomDetail } from '@/services/api';
 import { useI18n } from '@/i18n/useI18n';
 
@@ -77,29 +76,29 @@ export default function RoomLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold">{t('appName')}</h1>
-            <Link className="text-sm text-gray-600 hover:text-gray-900" href="/rooms">
-              {t('navRooms')}
-            </Link>
-            <Link className="text-sm text-gray-600 hover:text-gray-900" href={`/rooms/${roomId}`}>
-              {t('navDashboard')}
-            </Link>
-            {room?.role === 'host' ? (
-              <Link className="text-sm text-gray-600 hover:text-gray-900" href={`/rooms/${roomId}/admin`}>
-                {t('navAdmin')}
-              </Link>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-4">
-            {room ? <span className="hidden text-sm text-gray-500 md:inline">{room.name}</span> : null}
-            <LanguageSwitcher />
-            <UserButton afterSignOutUrl="/" />
-          </div>
-        </div>
-      </nav>
+      <AppNavbar
+        mode="signedIn"
+        afterSignOutUrl="/"
+        roomName={room?.name || null}
+        navItems={[
+          {
+            href: '/rooms',
+            label: t('navRooms'),
+          },
+          {
+            href: `/rooms/${roomId}`,
+            label: t('navDashboard'),
+          },
+          ...(room?.role === 'host'
+            ? [
+                {
+                  href: `/rooms/${roomId}/admin`,
+                  label: t('navAdmin'),
+                },
+              ]
+            : []),
+        ]}
+      />
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</main>
     </div>
